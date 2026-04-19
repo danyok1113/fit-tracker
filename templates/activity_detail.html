@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • тренировка{% endblock %}
+
+{% block content %}
+<style>
+    body { background: #020208; }
+    .detail-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .back-link { display: inline-block; color: #a090cc; text-decoration: none; margin-bottom: 20px; font-weight: 500; }
+    .detail-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        border-radius: 30px;
+        padding: 25px;
+        animation: fadeUp 0.5s ease;
+        border: 1px solid rgba(140,100,255,0.15);
+    }
+    .detail-header { margin-bottom: 25px; }
+    .detail-title { font-size: 26px; font-weight: 800; color: white; margin-bottom: 5px; }
+    .detail-date { color: #a090cc; font-size: 14px; }
+
+    .map-container {
+        height: 250px;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        background: #0a0a12;
+    }
+    #detailMap { width: 100%; height: 100%; }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 25px;
+    }
+
+    .stat-box {
+        background: rgba(20,10,40,0.6);
+        border-radius: 16px;
+        padding: 16px;
+        text-align: center;
+        border: 1px solid rgba(140,100,255,0.1);
+    }
+
+    .stat-value { font-size: 26px; font-weight: 800; color: white; }
+    .stat-label { font-size: 11px; color: #a090cc; text-transform: uppercase; margin-top: 4px; }
+
+    .delete-btn {
+        width: 100%;
+        padding: 16px;
+        background: transparent;
+        border: 1px solid rgba(239,68,68,0.4);
+        border-radius: 50px;
+        color: #EF4444;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .delete-btn:hover {
+        background: rgba(239,68,68,0.1);
+        border-color: #EF4444;
+    }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 500px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<div class="detail-container">
+    <a href="/activities" class="back-link">← назад к истории</a>
+    <div id="activityContent">
+        <div class="detail-card" style="text-align:center;padding:60px;">
+            <p style="color:#a090cc;">загрузка...</p>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const activityId = {{ activity_id }};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const container = document.getElementById('activityContent');
+    try {
+        const res = await fetch(`/api/activities/${activityId}`);
+        const act = await res.json();
+
+        const pointsRes = await fetch(`/api/activities/${activityId}/points`);
+        const points = await pointsRes.json();
+        console.log('📍 Точек для карты:', points.length);
+
+        const icons = { running: '🏃', cycling: '🚴', swimming: '🏊', strength: '🏋️' };
+        const date = new Date(act.start_time).toLocaleDateString('ru-RU', {
+            day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        let statsHtml = '';
+        let extraHtml = '';
+
+        if (act.sport_type === 'strength') {
+            statsHtml = `
+                <div class="stat-box"><div class="stat-value">${act.sets || 0}</div><div class="stat-label">подходов</div></div>
+                <div class="stat-box"><div class="stat-value">${Math.floor(act.duration / 60)}</div><div class="stat-label">минут</div></div>
+                <div class="stat-box"><div class="stat-value">${act.calories || 0}</div><div class="stat-label">ккал</div></div>
+                <div class="stat-box"><div class="stat-value">💪</div><div class="stat-label">силовая</div></div>
+            `;
+        } else if (act.sport_type === 'swimming') {
+            statsHtml = `
+                <div class="stat-box"><div class="stat-value">${(act.distance || 0).toFixed(0)}</div><div class="stat-label">метров</div></div>
+                <div class="stat-box"><div class="stat-value">${Math.floor(act.duration / 60)}:${(act.duration % 60).toString().padStart(2,'0')}</div><div class="stat-label">время</div></div>
+                <div class="stat-box"><div class="stat-value">${act.calories || 0}</div><div class="stat-label">ккал</div></div>
+                <div class="stat-box"><div class="stat-value">—</div><div class="stat-label">гребков</div></div>
+            `;
+        } else {
+            const dist = (act.distance / 1000).toFixed(2);
+            const pace = act.avg_pace ? `${Math.floor(act.avg_pace/60)}:${Math.floor(act.avg_pace%60).toString().padStart(2,'0')}` : '--:--';
+
+            statsHtml = `
+                <div class="stat-box"><div class="stat-value">${dist}</div><div class="stat-label">км</div></div>
+                <div class="stat-box"><div class="stat-value">${Math.floor(act.duration / 60)}:${(act.duration % 60).toString().padStart(2,'0')}</div><div class="stat-label">время</div></div>
+                <div class="stat-box"><div class="stat-value" style="color:#a080ff;">${pace}</div><div class="stat-label">темп /км</div></div>
+                <div class="stat-box"><div class="stat-value">${act.calories || 0}</div><div class="stat-label">ккал</div></div>
+            `;
+        }
+
+        // Карта — всегда создаём контейнер, если есть точки
+        let mapHtml = '';
+        if (points.length > 0 && (act.sport_type === 'running' || act.sport_type === 'cycling')) {
+            mapHtml = `<div class="map-container"><div id="detailMap"></div></div>`;
+        } else if (act.sport_type === 'running' || act.sport_type === 'cycling') {
+            mapHtml = `<div class="map-container" style="display:flex;align-items:center;justify-content:center;color:#a090cc;">нет данных маршрута</div>`;
+        }
+
+        container.innerHTML = `
+            <div class="detail-card">
+                <div class="detail-header">
+                    <div class="detail-title">${icons[act.sport_type] || '🏃'} ${act.name}</div>
+                    <div class="detail-date">📅 ${date}</div>
+                </div>
+
+                ${mapHtml}
+
+                <div class="stats-grid">${statsHtml}</div>
+
+                ${act.notes ? `<div class="notes-section" style="background:rgba(20,10,40,0.6);border-radius:16px;padding:16px;margin-bottom:25px;color:#a090cc;">📝 ${act.notes}</div>` : ''}
+
+                <button class="delete-btn" onclick="deleteActivity(${act.id})">🗑️ удалить</button>
+            </div>
+        `;
+
+        // Инициализируем карту ПОСЛЕ того, как HTML вставлен в DOM
+        if (points.length > 0 && (act.sport_type === 'running' || act.sport_type === 'cycling')) {
+            setTimeout(() => {
+                const mapElement = document.getElementById('detailMap');
+                if (mapElement) {
+                    const map = L.map('detailMap', { zoomControl: true, attributionControl: false });
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+                    const coords = points.map(p => [p.latitude, p.longitude]);
+                    L.polyline(coords, { color: '#a080ff', weight: 4 }).addTo(map);
+                    map.fitBounds(coords, { padding: [30, 30] });
+                    console.log('✅ Карта отрисована');
+                } else {
+                    console.error('❌ Элемент detailMap не найден');
+                }
+            }, 100);
+        }
+
+    } catch (e) {
+        container.innerHTML = '<div class="detail-card" style="text-align:center;padding:60px;"><p style="color:#EF4444;">ошибка загрузки</p></div>';
+    }
+});
+
+async function deleteActivity(id) {
+    if (!confirm('удалить тренировку?')) return;
+    try {
+        await fetch(`/api/activities/${id}`, { method: 'DELETE' });
+        window.location.href = '/activities';
+    } catch (e) { alert('ошибка удаления'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}RunTracker • AI Тренер{% endblock %}
+
+{% block content %}
+<style>
+    .chat-page { height: calc(100vh - 150px); display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; }
+    .chat-header { background: linear-gradient(135deg, #1A2332, #0D1117); border-radius: 25px; padding: 15px 20px; margin-bottom: 15px; border-left: 4px solid #00C9A7; display: flex; justify-content: space-between; }
+    .chat-header h2 { color: white; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+    .clear-btn { background: #EF4444; border: none; padding: 8px 16px; border-radius: 30px; color: white; font-size: 12px; cursor: pointer; }
+    .messages-area { flex: 1; overflow-y: auto; padding: 10px 5px; display: flex; flex-direction: column; gap: 15px; }
+    .message { display: flex; gap: 12px; max-width: 85%; }
+    .message.user-msg { align-self: flex-end; flex-direction: row-reverse; }
+    .message-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; background: #00C9A7; color: white; }
+    .ai-msg .message-avatar { background: #252F3F; color: #00C9A7; }
+    .message-bubble { background: #1A2332; padding: 15px 18px; border-radius: 20px; color: white; font-size: 15px; line-height: 1.5; }
+    .user-msg .message-bubble { background: linear-gradient(135deg, #00C9A7, #00B4D8); }
+    .input-area { background: #1A2332; border-radius: 60px; padding: 6px; display: flex; gap: 8px; margin-top: 20px; }
+    .input-area input { flex: 1; background: transparent; border: none; padding: 16px 20px; color: white; font-size: 16px; outline: none; }
+    .input-area button { background: #00C9A7; border: none; width: 52px; height: 52px; border-radius: 50%; color: white; font-size: 22px; cursor: pointer; }
+    .quick-questions { display: flex; gap: 8px; flex-wrap: wrap; margin: 15px 0 5px; }
+    .quick-btn { background: #252F3F; border: none; padding: 8px 14px; border-radius: 30px; color: #8A9BB5; font-size: 12px; cursor: pointer; }
+    .typing-indicator { display: flex; gap: 5px; padding: 15px; }
+    .typing-indicator span { width: 8px; height: 8px; border-radius: 50%; background: #8A9BB5; animation: typing 1.4s infinite; }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typing { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-10px); opacity: 1; } }
+</style>
+
+<div class="chat-page">
+    <div class="chat-header">
+        <h2>🧠 AI Тренер</h2>
+        <button class="clear-btn" id="clearHistoryBtn">🗑️ Очистить</button>
+    </div>
+
+    <div class="quick-questions">
+        <button class="quick-btn" data-q="Составь план тренировок на неделю">📅 План</button>
+        <button class="quick-btn" data-q="Как улучшить результаты?">⚡ Прогресс</button>
+        <button class="quick-btn" data-q="Что есть перед тренировкой?">🍎 Питание</button>
+        <button class="quick-btn" data-q="Как восстановиться?">🛌 Отдых</button>
+    </div>
+
+    <div class="messages-area" id="messagesArea"><div style="text-align:center;padding:40px;color:#8A9BB5;">Загрузка...</div></div>
+
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Напиши сообщение..." />
+        <button id="sendBtn">➤</button>
+    </div>
+</div>
+
+<script>
+const messagesArea = document.getElementById('messagesArea');
+const messageInput = document.getElementById('messageInput');
+let hasMessages = false;
+
+function addMessage(text, isUser=false) {
+    if (!hasMessages) { messagesArea.innerHTML = ''; hasMessages = true; }
+    const div = document.createElement('div');
+    div.className = `message ${isUser ? 'user-msg' : 'ai-msg'}`;
+    div.innerHTML = `<div class="message-avatar">${isUser ? '👤' : '🧠'}</div><div class="message-bubble">${text}</div>`;
+    messagesArea.appendChild(div);
+    messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'message ai-msg';
+    div.id = 'typingIndicator';
+    div.innerHTML = '<div class="message-avatar">🧠</div><div class="message-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
+    messagesArea.appendChild(div);
+    messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+async function loadHistory() {
+    try {
+        const res = await fetch('/api/ai/history');
+        const history = await res.json();
+        if (history.length) {
+            messagesArea.innerHTML = ''; hasMessages = true;
+            history.forEach(m => addMessage(m.message, m.is_user));
+        } else {
+            messagesArea.innerHTML = '<div style="text-align:center;padding:40px;color:#8A9BB5;">Задай вопрос AI-тренеру</div>';
+            hasMessages = false;
+        }
+    } catch(e) { messagesArea.innerHTML = '<div style="text-align:center;padding:40px;color:#8A9BB5;">Ошибка</div>'; }
+}
+
+async function sendMessage(text) {
+    if (!text.trim()) return;
+    addMessage(text, true);
+    messageInput.value = '';
+    document.getElementById('sendBtn').disabled = true;
+    showTyping();
+    try {
+        const res = await fetch('/api/ai/chat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message:text}) });
+        const data = await res.json();
+        document.getElementById('typingIndicator')?.remove();
+        addMessage(data.reply);
+    } catch(e) {
+        document.getElementById('typingIndicator')?.remove();
+        addMessage('Ошибка соединения');
+    } finally {
+        document.getElementById('sendBtn').disabled = false;
+        messageInput.focus();
+    }
+}
+
+loadHistory();
+document.getElementById('sendBtn').onclick = () => sendMessage(messageInput.value);
+messageInput.onkeypress = e => { if (e.key==='Enter') sendMessage(messageInput.value); };
+document.querySelectorAll('.quick-btn').forEach(b => b.onclick = () => sendMessage(b.dataset.q));
+document.getElementById('clearHistoryBtn').onclick = async () => {
+    if (!confirm('Очистить?')) return;
+    await fetch('/api/ai/clear', {method:'POST'});
+    messagesArea.innerHTML = '<div style="text-align:center;padding:40px;color:#8A9BB5;">История очищена</div>';
+    hasMessages = false;
+};
+</script>
+{% endblock %}

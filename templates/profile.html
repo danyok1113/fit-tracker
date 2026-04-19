@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • профиль{% endblock %}
+
+{% block content %}
+<style>
+    .profile-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .profile-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        backdrop-filter: blur(15px);
+        border-radius: 32px;
+        padding: 40px 32px;
+        border: 1px solid rgba(140,100,255,0.2);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        text-align: center;
+        animation: fadeUp 0.5s ease;
+    }
+
+    .avatar {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #4a2a6a, #2a1a4a);
+        border-radius: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 24px;
+        font-size: 48px;
+        color: #ffffff;
+        border: 2px solid rgba(180,140,255,0.4);
+        box-shadow: 0 10px 30px rgba(100,60,200,0.3);
+    }
+
+    .profile-name {
+        font-size: 28px;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 6px;
+    }
+
+    .profile-username {
+        color: #a090cc;
+        font-size: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-item {
+        background: rgba(20,10,40,0.6);
+        border-radius: 20px;
+        padding: 20px;
+        border: 1px solid rgba(140,100,255,0.1);
+    }
+
+    .stat-num {
+        font-size: 32px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .stat-text {
+        font-size: 12px;
+        color: #aaaaaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 6px;
+        font-weight: 600;
+    }
+
+    .params-section {
+        margin-bottom: 32px;
+    }
+
+    .section-title {
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        text-align: left;
+    }
+
+    .params-edit {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .param-input {
+        text-align: left;
+    }
+
+    .param-input label {
+        display: block;
+        color: #aaaaaa;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+
+    .param-input input {
+        width: 100%;
+        padding: 12px;
+        background: rgba(10,5,25,0.8);
+        border: 1px solid rgba(140,100,255,0.3);
+        border-radius: 14px;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 600;
+        outline: none;
+        transition: all 0.3s ease;
+    }
+
+    .param-input input:focus {
+        border-color: rgba(180,140,255,0.8);
+        box-shadow: 0 0 15px rgba(100,60,200,0.2);
+    }
+
+    .param-input input::placeholder {
+        color: #666;
+    }
+
+    .save-btn {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #3a1a5a, #1a0a3a);
+        border: 1px solid rgba(180,140,255,0.3);
+        border-radius: 50px;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+
+    .save-btn:hover {
+        background: linear-gradient(135deg, #4a2a6a, #2a1a4a);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(100,60,200,0.3);
+    }
+
+    .logout-btn {
+        width: 100%;
+        padding: 16px;
+        background: transparent;
+        border: 1px solid rgba(200,80,80,0.3);
+        border-radius: 50px;
+        color: #ff8080;
+        font-weight: 600;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+        background: rgba(200,80,80,0.1);
+        border-color: rgba(200,80,80,0.6);
+    }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="avatar">{{ (current_user.name or current_user.username)[0].upper() }}</div>
+        <div class="profile-name" id="profileName">{{ current_user.name or current_user.username }}</div>
+        <div class="profile-username" id="profileUsername">@{{ current_user.username }}</div>
+
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-num" id="totalDist">0</div>
+                <div class="stat-text">км</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num" id="totalTime">0</div>
+                <div class="stat-text">часов</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num" id="totalActs">0</div>
+                <div class="stat-text">тренировок</div>
+            </div>
+        </div>
+
+        <div class="params-section">
+            <div class="section-title">параметры</div>
+            <div class="params-edit">
+                <div class="param-input">
+                    <label>вес (кг)</label>
+                    <input type="number" id="weightInput" value="{{ current_user.weight or 70 }}" step="0.1" min="30" max="200">
+                </div>
+                <div class="param-input">
+                    <label>рост (см)</label>
+                    <input type="number" id="heightInput" value="{{ current_user.height or 175 }}" min="100" max="250">
+                </div>
+                <div class="param-input">
+                    <label>возраст</label>
+                    <input type="number" id="ageInput" value="{{ current_user.age or 25 }}" min="10" max="100">
+                </div>
+            </div>
+            <button class="save-btn" id="saveParamsBtn">сохранить параметры</button>
+        </div>
+
+        <button class="logout-btn" id="logoutBtn">выйти из аккаунта</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const user = await API.get('/api/user');
+        document.getElementById('profileName').textContent = user.name || user.username;
+        document.getElementById('profileUsername').textContent = '@' + user.username;
+        document.getElementById('totalDist').textContent = ((user.total_distance || 0) / 1000).toFixed(1);
+        document.getElementById('totalTime').textContent = Math.floor((user.total_time || 0) / 3600);
+        document.getElementById('totalActs').textContent = user.total_activities || 0;
+    } catch (e) {}
+
+    document.getElementById('saveParamsBtn').onclick = async () => {
+        const weight = document.getElementById('weightInput').value;
+        const height = document.getElementById('heightInput').value;
+        const age = document.getElementById('ageInput').value;
+
+        try {
+            await API.post('/api/user/params', { weight, height, age });
+            alert('✅ параметры сохранены');
+        } catch (e) {
+            alert('ошибка сохранения');
+        }
+    };
+
+    document.getElementById('logoutBtn').onclick = async () => {
+        await API.post('/api/logout');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+    };
+});
+</script>
+{% endblock %}

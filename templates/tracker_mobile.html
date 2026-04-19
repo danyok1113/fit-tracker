@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • трекер{% endblock %}
+
+{% block content %}
+<style>
+    body { background: #020208; margin: 0; padding: 0; }
+    .main-content { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+
+    .tracker {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 70px);
+        background: #020208;
+    }
+
+    #map {
+        flex: 1.5;  /* ещё меньше — было 2 */
+        width: 100%;
+        background: #0a0a12;
+        min-height: 0;
+    }
+
+    .panel {
+        flex: 1.5;
+        background: #0a0218;
+        padding: 20px 20px 28px;
+        border-top: 1px solid rgba(140,100,255,0.2);
+        overflow-y: auto;
+    }
+
+    .sport-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .sport-btn {
+        flex: 1;
+        padding: 18px;
+        background: #1a0a30;
+        border: 1px solid rgba(160,128,255,0.2);
+        border-radius: 50px;
+        color: #aaaaaa;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .sport-btn.active {
+        background: #a080ff;
+        color: #000000;
+        border-color: #a080ff;
+    }
+
+    .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .metric {
+        text-align: left;
+    }
+
+    .metric-value {
+        font-size: 56px;
+        font-weight: 300;
+        color: #ffffff;
+        line-height: 1;
+    }
+
+    .metric-label {
+        font-size: 13px;
+        color: #888888;
+        text-transform: uppercase;
+        margin-top: 6px;
+    }
+
+    .sub-metrics {
+        display: flex;
+        gap: 30px;
+        margin-bottom: 20px;
+    }
+
+    .sub-item {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+    }
+
+    .sub-value {
+        font-size: 22px;
+        font-weight: 600;
+        color: #ffffff;
+    }
+
+    .sub-label {
+        font-size: 13px;
+        color: #888888;
+    }
+
+    .actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn {
+        border: none;
+        border-radius: 60px;
+        font-weight: 600;
+        font-size: 17px;
+        cursor: pointer;
+        padding: 18px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+        flex: 3;
+        background: #a080ff;
+        color: #000000;
+    }
+
+    .btn-secondary {
+        flex: 1;
+        background: #1a0a30;
+        color: #ffffff;
+        border: 1px solid rgba(160,128,255,0.3);
+    }
+
+    .btn:disabled { opacity: 0.3; }
+
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .gps-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #444455;
+    }
+
+    .gps-dot.active {
+        background: #a080ff;
+        box-shadow: 0 0 15px #a080ff;
+    }
+
+    .status-text {
+        color: #888888;
+        font-size: 14px;
+    }
+
+    .sensitivity-section {
+        margin-bottom: 18px;
+        padding: 12px;
+        background: #1a0a30;
+        border-radius: 20px;
+    }
+
+    .sensitivity-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .sensitivity-label {
+        color: #aaaaaa;
+        font-size: 13px;
+    }
+
+    .sensitivity-value {
+        color: #a080ff;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    input[type=range] {
+        width: 100%;
+        accent-color: #a080ff;
+    }
+</style>
+
+<div class="tracker">
+    <div id="map"></div>
+
+    <div class="panel">
+        <div class="sport-row">
+            <button class="sport-btn active" data-sport="running">🏃 бег</button>
+            <button class="sport-btn" data-sport="cycling">🚴 вело</button>
+        </div>
+
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="mainMetric">0.00</div>
+                <div class="metric-label" id="mainLabel">км</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="timeMetric">00:00</div>
+                <div class="metric-label">время</div>
+            </div>
+        </div>
+
+        <div class="sub-metrics" id="subMetrics">
+            <div class="sub-item" id="stepsItem">
+                <span class="sub-value" id="stepsValue">0</span>
+                <span class="sub-label">шаги</span>
+            </div>
+            <div class="sub-item">
+                <span class="sub-value" id="caloriesValue">0</span>
+                <span class="sub-label">ккал</span>
+            </div>
+            <div class="sub-item">
+                <span class="sub-value" id="gpsValue">--</span>
+                <span class="sub-label">gps</span>
+            </div>
+        </div>
+
+        <div class="sensitivity-section" id="sensitivitySection">
+            <div class="sensitivity-header">
+                <span class="sensitivity-label">🎯 чувствительность</span>
+                <span class="sensitivity-value" id="sensVal">низкая</span>
+            </div>
+            <input type="range" id="sensSlider" min="1" max="5" value="2">
+        </div>
+
+        <div class="status">
+            <div class="gps-dot" id="gpsDot"></div>
+            <span class="status-text" id="statusText">готов</span>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" id="startBtn">старт</button>
+            <button class="btn btn-secondary" id="pauseBtn" disabled>⏸</button>
+            <button class="btn btn-secondary" id="stopBtn" disabled>⏹</button>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map, routeLayer, marker, trackPoints = [];
+let isTracking = false, isPaused = false, currentSport = 'running';
+let distance = 0, steps = 0, calories = 0, duration = 0;
+let startTime, timer, watchId;
+let sensitivity = 2;
+let lastStepTime = 0;
+
+const STEP_LENGTH = { running: 1.1, cycling: 0 };
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+function initMap() {
+    map = L.map('map', { zoomControl: false, attributionControl: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    routeLayer = L.polyline([], { color: '#a080ff', weight: 3 }).addTo(map);
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            p => map.setView([p.coords.latitude, p.coords.longitude], 16),
+            () => map.setView([55.7558, 37.6173], 12),
+            { timeout: 5000 }
+        );
+    } else {
+        map.setView([55.7558, 37.6173], 12);
+    }
+}
+
+function updateUI() {
+    document.getElementById('mainMetric').textContent = (distance / 1000).toFixed(2);
+    document.getElementById('timeMetric').textContent = `${Math.floor(duration/60)}:${(duration%60).toString().padStart(2,'0')}`;
+    document.getElementById('stepsValue').textContent = steps;
+    document.getElementById('caloriesValue').textContent = calories;
+}
+
+window.addEventListener('devicemotion', e => {
+    if (!isTracking || isPaused || currentSport !== 'running') return;
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
+
+    const mag = Math.abs(Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z) - 9.8);
+    const now = Date.now();
+    const thresholds = [5.0, 4.5, 4.0, 3.5, 3.0];
+    const minInterval = 500;
+
+    if (mag > thresholds[sensitivity - 1] && (now - lastStepTime) > minInterval) {
+        steps++;
+        distance += STEP_LENGTH[currentSport];
+        calories = Math.round(steps * 0.04);
+        lastStepTime = now;
+        updateUI();
+    }
+});
+
+function handleGPS(pos) {
+    if (!isTracking || isPaused) return;
+
+    const p = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+    };
+
+    document.getElementById('gpsValue').textContent = Math.round(p.accuracy) + 'м';
+    document.getElementById('gpsDot').classList.add('active');
+
+    if (currentSport === 'cycling' && trackPoints.length > 0) {
+        const prev = trackPoints[trackPoints.length-1];
+        const d = map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+        if (d < 50) {
+            distance += d;
+            calories = Math.round((distance/1000) * 30);
+        }
+    }
+
+    trackPoints.push(p);
+
+    if (!marker) {
+        marker = L.circleMarker([p.lat, p.lng], {
+            radius: 8, color: '#a080ff', fillColor: '#a080ff', fillOpacity: 0.8
+        }).addTo(map);
+    } else {
+        marker.setLatLng([p.lat, p.lng]);
+    }
+
+    routeLayer.addLatLng([p.lat, p.lng]);
+    map.setView([p.lat, p.lng]);
+    updateUI();
+}
+
+function handleGPSError(error) {
+    document.getElementById('gpsValue').textContent = 'ошибка';
+}
+
+async function start() {
+    if (isTracking) return;
+
+    if (isIOS && typeof DeviceMotionEvent.requestPermission === 'function') {
+        await DeviceMotionEvent.requestPermission();
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        p => { map.setView([p.coords.latitude, p.coords.longitude], 16); },
+        e => {},
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+
+    isTracking = true;
+    isPaused = false;
+    distance = 0;
+    steps = 0;
+    calories = 0;
+    duration = 0;
+    trackPoints = [];
+    startTime = Date.now();
+    lastStepTime = 0;
+
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = false;
+    document.querySelectorAll('.sport-btn').forEach(b => b.disabled = true);
+    document.getElementById('sensSlider').disabled = true;
+    document.getElementById('statusText').textContent = 'запись';
+
+    routeLayer.setLatLngs([]);
+    if (marker) map.removeLayer(marker);
+    marker = null;
+
+    watchId = navigator.geolocation.watchPosition(
+        handleGPS,
+        handleGPSError,
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+
+    timer = setInterval(() => {
+        duration++;
+        updateUI();
+    }, 1000);
+
+    updateUI();
+}
+
+function pause() {
+    if (!isTracking) return;
+    isPaused = !isPaused;
+    document.getElementById('pauseBtn').textContent = isPaused ? '▶' : '⏸';
+    document.getElementById('statusText').textContent = isPaused ? 'пауза' : 'запись';
+}
+
+async function stop() {
+    if (!isTracking) return;
+
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    clearInterval(timer);
+    isTracking = false;
+
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    document.querySelectorAll('.sport-btn').forEach(b => b.disabled = false);
+    document.getElementById('sensSlider').disabled = false;
+    document.getElementById('statusText').textContent = 'готов';
+    document.getElementById('gpsDot').classList.remove('active');
+
+    if (distance < 5 && steps < 5) {
+        alert('недостаточно данных');
+        return;
+    }
+
+    const activity = {
+        name: `${currentSport === 'running' ? '🏃 бег' : '🚴 вело'} ${new Date().toLocaleDateString('ru-RU')}`,
+        sport_type: currentSport,
+        start_time: new Date(startTime).toISOString(),
+        end_time: new Date().toISOString(),
+        distance, duration, calories, steps,
+        track_points: trackPoints.map(p => ({
+            latitude: p.lat, longitude: p.lng, timestamp: new Date().toISOString()
+        }))
+    };
+
+    try {
+        const res = await fetch('/api/activities', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(activity)
+        });
+
+        if (res.ok) {
+            const d = await res.json();
+            window.location.href = `/activity/${d.id}`;
+        } else {
+            alert('ошибка сохранения');
+        }
+    } catch {
+        alert('ошибка сети');
+    }
+}
+
+document.querySelectorAll('.sport-btn').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.sport-btn').forEach(x => {
+        x.classList.remove('active');
+        x.style.background = '#1a0a30';
+        x.style.color = '#aaaaaa';
+    });
+    b.classList.add('active');
+    b.style.background = '#a080ff';
+    b.style.color = '#000000';
+    currentSport = b.dataset.sport;
+
+    document.getElementById('stepsItem').style.opacity = currentSport === 'cycling' ? '0.4' : '1';
+    document.getElementById('sensitivitySection').style.opacity = currentSport === 'cycling' ? '0.4' : '1';
+    document.getElementById('sensSlider').disabled = currentSport === 'cycling';
+});
+
+document.getElementById('sensSlider').oninput = function() {
+    sensitivity = parseInt(this.value);
+    const labels = ['очень низкая', 'низкая', 'средняя', 'высокая', 'максимальная'];
+    document.getElementById('sensVal').textContent = labels[sensitivity-1];
+};
+
+document.getElementById('startBtn').onclick = start;
+document.getElementById('pauseBtn').onclick = pause;
+document.getElementById('stopBtn').onclick = stop;
+
+initMap();
+</script>
+{% endblock %}

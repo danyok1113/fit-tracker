@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}runtracker • трекер{% endblock %}
+
+{% block content %}
+<style>
+    .pc-message {
+        max-width: 500px;
+        margin: 80px auto;
+        text-align: center;
+    }
+
+    .pc-message h1 {
+        font-size: 28px;
+        font-weight: 300;
+        color: #ffffff;
+        margin-bottom: 16px;
+        letter-spacing: -0.5px;
+    }
+
+    .pc-message p {
+        color: #888888;
+        font-weight: 300;
+        margin-bottom: 32px;
+    }
+
+    .device-box {
+        background: #0a0a0a;
+        border-radius: 24px;
+        padding: 40px;
+        border: 0.5px solid #1a1a1a;
+    }
+
+    .device-icon {
+        font-size: 56px;
+        margin-bottom: 24px;
+    }
+
+    .device-url {
+        background: #000000;
+        padding: 14px 24px;
+        border-radius: 40px;
+        display: inline-block;
+        color: #ffffff;
+        font-weight: 300;
+        font-size: 15px;
+        border: 0.5px solid #1a1a1a;
+    }
+
+    .links {
+        margin-top: 32px;
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+    }
+
+    .link {
+        color: #888888;
+        text-decoration: none;
+        font-weight: 300;
+    }
+</style>
+
+<div class="pc-message">
+    <h1>откройте на телефоне</h1>
+    <p>для записи тренировок с gps используйте мобильную версию</p>
+
+    <div class="device-box">
+        <div class="device-icon">📱</div>
+        <p style="color: #666666; margin-bottom: 20px;">подключитесь к той же wi-fi сети</p>
+        <div class="device-url">https://192.168.0.106:5000/tracker</div>
+    </div>
+
+    <div class="links">
+        <a href="/activities/add" class="link">добавить вручную</a>
+        <span style="color: #333333;">•</span>
+        <a href="/dashboard" class="link">назад</a>
+    </div>
+</div>
+{% endblock %}

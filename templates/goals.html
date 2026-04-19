@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • цели{% endblock %}
+
+{% block content %}
+<style>
+    .goals-container {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-header h1 {
+        font-size: 36px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -1px;
+    }
+
+    .page-header p {
+        color: #a090cc;
+        font-size: 16px;
+        margin-top: 8px;
+    }
+
+    .add-goal-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        border-radius: 28px;
+        padding: 28px;
+        margin-bottom: 28px;
+        border: 1px solid rgba(140,100,255,0.2);
+    }
+
+    .add-goal-title {
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+
+    .goal-type-selector {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .goal-type-btn {
+        padding: 14px 8px;
+        background: rgba(20,10,40,0.6);
+        border: 1px solid rgba(140,100,255,0.2);
+        border-radius: 16px;
+        color: #aaaaaa;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .goal-type-btn.active {
+        background: #a080ff;
+        color: #000000;
+        border-color: #a080ff;
+    }
+
+    .goal-input-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .goal-input-row input {
+        flex: 1;
+        padding: 16px;
+        background: rgba(10,5,25,0.8);
+        border: 1px solid rgba(140,100,255,0.3);
+        border-radius: 16px;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 600;
+        outline: none;
+    }
+
+    .goal-input-row span {
+        color: #a090cc;
+        font-size: 16px;
+        min-width: 50px;
+    }
+
+    .save-goal-btn {
+        width: 100%;
+        padding: 16px;
+        background: #a080ff;
+        border: none;
+        border-radius: 50px;
+        color: #000000;
+        font-weight: 700;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 20px;
+        transition: all 0.3s ease;
+    }
+
+    .save-goal-btn:hover {
+        background: #b090ff;
+        transform: translateY(-2px);
+    }
+
+    .active-goals {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .goal-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        border-radius: 24px;
+        padding: 24px;
+        border: 1px solid rgba(140,100,255,0.15);
+        animation: fadeUp 0.5s ease;
+    }
+
+    .goal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .goal-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .goal-icon {
+        font-size: 28px;
+    }
+
+    .goal-name {
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .goal-delete {
+        background: none;
+        border: none;
+        color: #666;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 8px;
+        transition: color 0.2s;
+    }
+
+    .goal-delete:hover {
+        color: #ff6666;
+    }
+
+    .goal-progress {
+        margin-bottom: 12px;
+    }
+
+    .progress-bar {
+        height: 8px;
+        background: rgba(20,10,40,0.6);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #a080ff, #c0a0ff);
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        color: #a090cc;
+        font-size: 14px;
+    }
+
+    .goal-completed {
+        opacity: 0.7;
+    }
+
+    .goal-completed .progress-fill {
+        background: #00cc88;
+    }
+
+    .completed-badge {
+        color: #00cc88;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #888;
+    }
+
+    .empty-icon {
+        font-size: 60px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 500px) {
+        .goal-type-selector { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+
+<div class="goals-container">
+    <div class="page-header">
+        <h1>🎯 цели</h1>
+        <p>ставь цели и отслеживай прогресс</p>
+    </div>
+
+    <!-- Добавление цели -->
+    <div class="add-goal-card">
+        <div class="add-goal-title">новая цель на неделю</div>
+
+        <div class="goal-type-selector">
+            <div class="goal-type-btn active" data-type="distance">📏 дистанция</div>
+            <div class="goal-type-btn" data-type="activities">🏃 тренировки</div>
+            <div class="goal-type-btn" data-type="calories">🔥 калории</div>
+            <div class="goal-type-btn" data-type="time">⏱️ время</div>
+        </div>
+
+        <div class="goal-input-row">
+            <input type="number" id="goalValue" placeholder="0" min="1" value="20">
+            <span id="goalUnit">км</span>
+        </div>
+
+        <button class="save-goal-btn" onclick="saveGoal()">💾 сохранить цель</button>
+    </div>
+
+    <!-- Активные цели -->
+    <div class="active-goals" id="activeGoals">
+        <div class="empty-state">
+            <div class="empty-icon">🎯</div>
+            <p>загрузка целей...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentGoalType = 'distance';
+let weeklyStats = {};
+
+const unitLabels = {
+    distance: 'км',
+    activities: 'тренировок',
+    calories: 'ккал',
+    time: 'минут'
+};
+
+const goalIcons = {
+    distance: '📏',
+    activities: '🏃',
+    calories: '🔥',
+    time: '⏱️'
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Загружаем статистику за неделю
+    try {
+        weeklyStats = await API.get('/api/user/stats/weekly');
+    } catch (e) {
+        console.error('Ошибка загрузки статистики:', e);
+    }
+
+    loadGoals();
+
+    // Переключение типа цели
+    document.querySelectorAll('.goal-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.goal-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentGoalType = btn.dataset.type;
+            document.getElementById('goalUnit').textContent = unitLabels[currentGoalType];
+
+            // Предустановленные значения
+            const defaults = { distance: 20, activities: 4, calories: 2000, time: 180 };
+            document.getElementById('goalValue').value = defaults[currentGoalType];
+        });
+    });
+});
+
+async function saveGoal() {
+    const value = parseFloat(document.getElementById('goalValue').value);
+    if (!value || value <= 0) {
+        alert('введи значение больше 0');
+        return;
+    }
+
+    const goals = JSON.parse(localStorage.getItem('fit_goals') || '[]');
+
+    // Удаляем старую цель такого же типа
+    const filtered = goals.filter(g => g.type !== currentGoalType);
+
+    filtered.push({
+        type: currentGoalType,
+        target: value,
+        createdAt: new Date().toISOString(),
+        startDate: new Date().toISOString()
+    });
+
+    localStorage.setItem('fit_goals', JSON.stringify(filtered));
+    loadGoals();
+}
+
+function loadGoals() {
+    const goals = JSON.parse(localStorage.getItem('fit_goals') || '[]');
+    const container = document.getElementById('activeGoals');
+
+    if (goals.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🎯</div>
+                <p>нет активных целей</p>
+                <p style="font-size: 14px; margin-top: 8px;">добавь цель выше</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Считаем текущий прогресс
+    const progress = {
+        distance: (weeklyStats.total_distance || 0) / 1000,
+        activities: weeklyStats.total_activities || 0,
+        calories: weeklyStats.total_calories || 0,
+        time: Math.floor((weeklyStats.total_time || 0) / 60)
+    };
+
+    container.innerHTML = goals.map(goal => {
+        const current = progress[goal.type] || 0;
+        const percent = Math.min(100, (current / goal.target) * 100);
+        const isCompleted = current >= goal.target;
+
+        return `
+            <div class="goal-card ${isCompleted ? 'goal-completed' : ''}">
+                <div class="goal-header">
+                    <div class="goal-title">
+                        <span class="goal-icon">${goalIcons[goal.type]}</span>
+                        <span class="goal-name">${goal.target} ${unitLabels[goal.type]}</span>
+                    </div>
+                    <button class="goal-delete" onclick="deleteGoal('${goal.type}')">✕</button>
+                </div>
+                <div class="goal-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%"></div>
+                    </div>
+                    <div class="progress-stats">
+                        <span>${current.toFixed(goal.type === 'distance' ? 1 : 0)} / ${goal.target} ${unitLabels[goal.type]}</span>
+                        <span class="${isCompleted ? 'completed-badge' : ''}">${isCompleted ? '🎉 выполнено!' : Math.round(percent) + '%'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function deleteGoal(type) {
+    const goals = JSON.parse(localStorage.getItem('fit_goals') || '[]');
+    const filtered = goals.filter(g => g.type !== type);
+    localStorage.setItem('fit_goals', JSON.stringify(filtered));
+    loadGoals();
+}
+</script>
+{% endblock %}

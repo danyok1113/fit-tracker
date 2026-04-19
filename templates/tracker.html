@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block title %}RunTracker • Запись тренировки{% endblock %}
+
+{% block content %}
+<style>
+    /* Анимации */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(100px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes glow {
+        0%, 100% { box-shadow: 0 0 5px #238636; }
+        50% { box-shadow: 0 0 20px #238636; }
+    }
+
+    .tracker-container {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        background: #0D1117;
+    }
+
+    /* ПК версия */
+    @media (min-width: 768px) {
+        .tracker-container {
+            flex-direction: row;
+        }
+
+        .map-section {
+            flex: 1;
+        }
+
+        .stats-section {
+            width: 380px;
+            overflow-y: auto;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .metric-value {
+            font-size: 42px !important;
+        }
+    }
+
+    /* Мобильная версия */
+    @media (max-width: 767px) {
+        .tracker-container {
+            flex-direction: column;
+        }
+
+        .map-section {
+            flex: 2;
+        }
+
+        .stats-section {
+            background: #161B22;
+            border-radius: 20px 20px 0 0;
+            padding: 16px;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        .metric-value {
+            font-size: 28px !important;
+        }
+
+        /* Компактные отступы для мобилы */
+        .stats-section * {
+            max-width: 100%;
+            word-break: break-word;
+        }
+    }
+
+    /* Общие стили */
+    .sport-btn {
+        transition: all 0.3s ease;
+    }
+
+    .sport-btn:hover {
+        transform: scale(0.97);
+    }
+
+    .control-btn {
+        transition: all 0.2s ease;
+    }
+
+    .control-btn:active {
+        transform: scale(0.95);
+    }
+
+    .recording-pulse {
+        animation: pulse 1.5s infinite;
+    }
+
+    .gps-active {
+        animation: glow 2s infinite;
+    }
+
+    /* Скроллбар для ПК */
+    .stats-section::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .stats-section::-webkit-scrollbar-thumb {
+        background: #30363D;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="tracker-container">
+    <!-- Карта -->
+    <div class="map-section" id="trackerMap"></div>
+
+    <!-- Панель статистики -->
+    <div class="stats-section">
+
+        <!-- Тип тренировки -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <button id="sportRunning" class="sport-btn active" data-sport="running" style="flex: 1; padding: 12px 8px; border: none; border-radius: 40px; font-weight: 600; font-size: 14px; cursor: pointer; background: #238636; color: white;">
+                <i class="fas fa-running"></i> <span class="sport-text">Бег</span>
+            </button>
+            <button id="sportWalking" class="sport-btn" data-sport="walking" style="flex: 1; padding: 12px 8px; border: none; border-radius: 40px; font-weight: 600; font-size: 14px; cursor: pointer; background: #21262D; color: #8B949E;">
+                <i class="fas fa-walking"></i> <span class="sport-text">Ходьба</span>
+            </button>
+            <button id="sportCycling" class="sport-btn" data-sport="cycling" style="flex: 1; padding: 12px 8px; border: none; border-radius: 40px; font-weight: 600; font-size: 14px; cursor: pointer; background: #21262D; color: #8B949E;">
+                <i class="fas fa-bicycle"></i> <span class="sport-text">Вело</span>
+            </button>
+        </div>
+
+        <!-- Основные метрики -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px;">
+            <div style="text-align: center; background: linear-gradient(135deg, #21262D 0%, #161B22 100%); padding: 15px 5px; border-radius: 16px;">
+                <div style="font-size: 11px; color: #8B949E; text-transform: uppercase; letter-spacing: 1px;">Дистанция</div>
+                <div id="distanceDisplay" class="metric-value" style="font-weight: 700; color: white; line-height: 1.2;">0.00</div>
+                <div style="font-size: 11px; color: #8B949E;">км</div>
+            </div>
+            <div style="text-align: center; background: linear-gradient(135deg, #21262D 0%, #161B22 100%); padding: 15px 5px; border-radius: 16px;">
+                <div style="font-size: 11px; color: #8B949E; text-transform: uppercase; letter-spacing: 1px;">Время</div>
+                <div id="durationDisplay" class="metric-value" style="font-weight: 700; color: white; line-height: 1.2;">00:00</div>
+                <div style="font-size: 11px; color: #8B949E;">мин:сек</div>
+            </div>
+            <div style="text-align: center; background: linear-gradient(135deg, #21262D 0%, #161B22 100%); padding: 15px 5px; border-radius: 16px;">
+                <div style="font-size: 11px; color: #8B949E; text-transform: uppercase; letter-spacing: 1px;">Темп</div>
+                <div id="paceDisplay" class="metric-value" style="font-weight: 700; color: #238636; line-height: 1.2;">--:--</div>
+                <div style="font-size: 11px; color: #8B949E;">/км</div>
+            </div>
+        </div>
+
+        <!-- Вторичные метрики -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; padding: 12px; background: #21262D; border-radius: 16px;">
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #8B949E;">👟 Шаги</div>
+                <div id="stepsDisplay" style="font-size: 22px; font-weight: 700; color: white;">0</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #8B949E;">🔥 Калории</div>
+                <div id="caloriesDisplay" style="font-size: 22px; font-weight: 700; color: #F0883E;">0</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #8B949E;">📍 GPS</div>
+                <div id="gpsAccuracyDisplay" style="font-size: 22px; font-weight: 700; color: #8B949E;">--</div>
+            </div>
+        </div>
+
+        <!-- Настройка чувствительности -->
+        <div style="margin-bottom: 20px; padding: 12px; background: #21262D; border-radius: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 12px; color: #8B949E;">🎯 Чувствительность</span>
+                <span id="sensitivityValue" style="font-size: 12px; color: white; font-weight: 600;">Очень низкая</span>
+            </div>
+            <input type="range" id="sensitivitySlider" min="1" max="6" value="1" step="1" style="width: 100%; accent-color: #238636;">
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #8B949E; margin-top: 5px;">
+                <span>Мин</span>
+                <span>Низкая</span>
+                <span>Средняя</span>
+                <span>Высокая</span>
+                <span>Макс</span>
+                <span>Авто</span>
+            </div>
+        </div>
+
+        <!-- Статус -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px;">
+            <div id="gpsIndicator" style="width: 10px; height: 10px; background: #8B949E; border-radius: 50%; transition: all 0.3s;"></div>
+            <span id="gpsText" style="font-size: 13px; color: #8B949E;">Готов к старту</span>
+        </div>
+
+        <!-- Кнопки управления -->
+        <div style="display: flex; gap: 10px;">
+            <button id="startBtn" class="control-btn" style="flex: 3; padding: 18px; border: none; border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, #238636, #2EA043); color: white;">
+                <i class="fas fa-play"></i> СТАРТ
+            </button>
+            <button id="pauseBtn" class="control-btn" disabled style="flex: 1; padding: 18px; border: none; border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer; background: #21262D; color: #8B949E; opacity: 0.5;">
+                <i class="fas fa-pause"></i>
+            </button>
+            <button id="stopBtn" class="control-btn" disabled style="flex: 1; padding: 18px; border: none; border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer; background: #DA3633; color: white; opacity: 0.5;">
+                <i class="fas fa-stop"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Глобальные переменные
+let map, routeLayer, currentMarker;
+let trackPoints = [];
+let isTracking = false, isPaused = false;
+let watchId = null, timerInterval = null;
+let startTime = null, pauseTime = null, totalPauseDuration = 0;
+let currentSport = 'running';
+let distance = 0, steps = 0, calories = 0;
+let sensitivity = 1;
+
+// Шагомер
+let lastMagnitude = 0, lastStepTime = 0;
+
+function getThreshold() {
+    const thresholds = [2.0, 1.5, 1.2, 0.9, 0.7, 0.5];
+    return thresholds[sensitivity - 1] || 1.2;
+}
+
+function getMinInterval() {
+    const intervals = [350, 300, 250, 220, 180, 150];
+    return intervals[sensitivity - 1] || 250;
+}
+
+const STEP_LENGTHS = { running: 1.1, walking: 0.7, cycling: 0 };
+
+function initMap() {
+    map = L.map('trackerMap', { zoomControl: false, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '',
+        subdomains: ['a', 'b', 'c']
+    }).addTo(map);
+    L.control.zoom({ position: window.innerWidth < 768 ? 'bottomright' : 'topright' }).addTo(map);
+    routeLayer = L.polyline([], { color: '#238636', weight: 4 }).addTo(map);
+    map.setView([55.7558, 37.6173], 12);
+}
+
+function updateSensitivityLabel() {
+    const labels = ['Очень низкая', 'Низкая', 'Средняя', 'Высокая', 'Максимальная', 'Авто'];
+    document.getElementById('sensitivityValue').textContent = labels[sensitivity - 1];
+}
+
+function initStepDetector() {
+    if (!window.DeviceMotionEvent) return;
+    window.addEventListener('devicemotion', (e) => {
+        if (!isTracking || isPaused) return;
+        const acc = e.accelerationIncludingGravity;
+        if (!acc) return;
+        const magnitude = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z) - 9.8;
+        const absMag = Math.abs(magnitude);
+        const now = Date.now();
+        if (absMag > getThreshold() && (now - lastStepTime) > getMinInterval()) {
+            steps++;
+            distance += STEP_LENGTHS[currentSport] || 0.7;
+            calories = Math.round(steps * 0.04);
+            lastStepTime = now;
+            updateStats();
+        }
+    });
+}
+
+function requestGPS() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject('Геолокация не поддерживается');
+            return;
+        }
+        document.getElementById('gpsText').textContent = 'Запрос GPS...';
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                document.getElementById('gpsText').textContent = 'GPS готов';
+                document.getElementById('gpsIndicator').style.background = '#238636';
+                document.getElementById('gpsIndicator').classList.add('gps-active');
+                resolve(pos);
+            },
+            (err) => {
+                let msg = err.code === 1 ? 'GPS запрещён' : err.code === 2 ? 'Нет сигнала' : 'Таймаут';
+                document.getElementById('gpsText').textContent = msg;
+                document.getElementById('gpsIndicator').style.background = '#DA3633';
+                reject(err);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    });
+}
+
+function handlePosition(pos) {
+    if (!isTracking || isPaused) return;
+    const point = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        timestamp: Date.now()
+    };
+    const accuracy = Math.round(point.accuracy);
+    document.getElementById('gpsAccuracyDisplay').textContent = accuracy + 'м';
+    document.getElementById('gpsIndicator').style.background = accuracy < 30 ? '#238636' : '#F0883E';
+    document.getElementById('gpsText').textContent = `GPS ${accuracy}м`;
+    trackPoints.push(point);
+    updateMap(point);
+}
+
+function updateMap(point) {
+    const latlng = [point.latitude, point.longitude];
+    if (currentMarker) {
+        currentMarker.setLatLng(latlng);
+    } else {
+        currentMarker = L.circleMarker(latlng, { radius: 6, color: '#238636', weight: 2, fillColor: '#238636', fillOpacity: 1 }).addTo(map);
+    }
+    routeLayer.setLatLngs(trackPoints.map(p => [p.latitude, p.longitude]));
+    map.setView(latlng, map.getZoom());
+}
+
+function updateStats() {
+    document.getElementById('distanceDisplay').textContent = (distance / 1000).toFixed(2);
+    document.getElementById('stepsDisplay').textContent = steps;
+    document.getElementById('caloriesDisplay').textContent = calories;
+
+    let duration = 0;
+    if (startTime) {
+        const now = Date.now();
+        duration = Math.floor((now - startTime - totalPauseDuration) / 1000);
+        if (isPaused && pauseTime) duration = Math.floor((pauseTime - startTime - totalPauseDuration) / 1000);
+    }
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
+    document.getElementById('durationDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    if (distance > 20 && duration > 0) {
+        const pace = duration / (distance / 1000);
+        document.getElementById('paceDisplay').textContent = `${Math.floor(pace / 60)}:${Math.floor(pace % 60).toString().padStart(2, '0')}`;
+    }
+}
+
+async function startTracking() {
+    if (isTracking) return;
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        await DeviceMotionEvent.requestPermission();
+    }
+    try { await requestGPS(); } catch (e) {}
+
+    isTracking = true;
+    isPaused = false;
+    trackPoints = [];
+    distance = steps = calories = 0;
+    startTime = Date.now();
+    totalPauseDuration = 0;
+    lastStepTime = Date.now();
+
+    routeLayer.setLatLngs([]);
+    if (currentMarker) map.removeLayer(currentMarker);
+    currentMarker = null;
+
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('pauseBtn').style.opacity = '1';
+    document.getElementById('stopBtn').style.opacity = '1';
+    document.querySelectorAll('.sport-btn').forEach(b => b.disabled = true);
+    document.getElementById('sensitivitySlider').disabled = true;
+    document.getElementById('gpsIndicator').classList.add('recording-pulse');
+
+    watchId = navigator.geolocation.watchPosition(handlePosition, () => {}, { enableHighAccuracy: true });
+    timerInterval = setInterval(updateStats, 500);
+    updateStats();
+}
+
+function togglePause() {
+    if (!isTracking) return;
+    isPaused = !isPaused;
+    const btn = document.getElementById('pauseBtn');
+    if (isPaused) {
+        pauseTime = Date.now();
+        btn.innerHTML = '<i class="fas fa-play"></i>';
+        btn.style.background = '#238636';
+        document.getElementById('gpsText').textContent = 'ПАУЗА';
+        document.getElementById('gpsIndicator').classList.remove('recording-pulse');
+    } else {
+        totalPauseDuration += Date.now() - pauseTime;
+        btn.innerHTML = '<i class="fas fa-pause"></i>';
+        btn.style.background = '#21262D';
+        document.getElementById('gpsText').textContent = 'Запись...';
+        document.getElementById('gpsIndicator').classList.add('recording-pulse');
+    }
+}
+
+async function stopTracking() {
+    if (!isTracking) return;
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    clearInterval(timerInterval);
+    isTracking = false;
+
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('pauseBtn').style.opacity = '0.5';
+    document.getElementById('stopBtn').style.opacity = '0.5';
+    document.querySelectorAll('.sport-btn').forEach(b => b.disabled = false);
+    document.getElementById('sensitivitySlider').disabled = false;
+    document.getElementById('gpsIndicator').classList.remove('recording-pulse', 'gps-active');
+
+    if (distance < 5) { alert('Дистанция слишком мала'); return; }
+
+    const activity = {
+        name: `${currentSport === 'running' ? 'Бег' : currentSport === 'walking' ? 'Ходьба' : 'Вело'} • ${new Date().toLocaleDateString('ru-RU')}`,
+        sport_type: currentSport,
+        start_time: new Date(startTime).toISOString(),
+        end_time: new Date().toISOString(),
+        track_points: trackPoints.length > 0 ? trackPoints.map(p => ({
+            latitude: p.latitude, longitude: p.longitude, timestamp: new Date(p.timestamp).toISOString()
+        })) : [{ latitude: 55.7558, longitude: 37.6173, timestamp: new Date().toISOString() }]
+    };
+
+    try {
+        const res = await fetch('/api/activities', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(activity)
+        });
+        if (res.ok) window.location.href = `/activity/${(await res.json()).id}`;
+    } catch(e) { alert('Сохранено локально'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    initStepDetector();
+    updateSensitivityLabel();
+
+    document.getElementById('sensitivitySlider').addEventListener('input', (e) => {
+        sensitivity = parseInt(e.target.value);
+        updateSensitivityLabel();
+    });
+
+    document.getElementById('startBtn').addEventListener('click', startTracking);
+    document.getElementById('pauseBtn').addEventListener('click', togglePause);
+    document.getElementById('stopBtn').addEventListener('click', stopTracking);
+
+    document.querySelectorAll('.sport-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.sport-btn').forEach(b => {
+                b.style.background = '#21262D';
+                b.style.color = '#8B949E';
+            });
+            btn.style.background = btn.dataset.sport === 'running' ? '#238636' : '#1F6FEB';
+            btn.style.color = 'white';
+            currentSport = btn.dataset.sport;
+        });
+    });
+
+    // Адаптация под мобилу - скрываем текст на кнопках если мало места
+    if (window.innerWidth < 400) {
+        document.querySelectorAll('.sport-text').forEach(el => el.style.display = 'none');
+    }
+});
+</script>
+{% endblock %}

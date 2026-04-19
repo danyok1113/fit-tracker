@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • графики{% endblock %}
+
+{% block content %}
+<style>
+    .charts-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 36px;
+    }
+
+    .page-header h1 {
+        font-size: 36px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -1px;
+    }
+
+    .page-header p {
+        color: #aaaaaa;
+        font-size: 16px;
+        margin-top: 8px;
+    }
+
+    .sport-tabs {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 32px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+
+    .sport-tab {
+        padding: 14px 28px;
+        background: rgba(20,10,40,0.6);
+        border: 1px solid rgba(140,100,255,0.2);
+        border-radius: 40px;
+        color: #aaaaaa;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sport-tab i {
+        font-size: 18px;
+    }
+
+    .sport-tab.active {
+        background: linear-gradient(135deg, #3a1a5a, #1a0a3a);
+        color: #ffffff;
+        border-color: rgba(180,140,255,0.5);
+    }
+
+    .chart-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        backdrop-filter: blur(15px);
+        border-radius: 28px;
+        padding: 28px;
+        margin-bottom: 28px;
+        border: 1px solid rgba(140,100,255,0.15);
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .chart-header h2 {
+        color: #ffffff;
+        font-size: 22px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .period-tabs {
+        display: flex;
+        gap: 8px;
+    }
+
+    .period-tab {
+        padding: 8px 16px;
+        background: rgba(20,10,40,0.6);
+        border: 1px solid rgba(140,100,255,0.2);
+        border-radius: 30px;
+        color: #aaaaaa;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .period-tab.active {
+        background: #3a1a5a;
+        color: #ffffff;
+        border-color: rgba(180,140,255,0.4);
+    }
+
+    .chart-container {
+        height: 250px;
+        margin-bottom: 20px;
+    }
+
+    .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 24px;
+    }
+
+    .summary-item {
+        text-align: center;
+        padding: 16px;
+        background: rgba(20,10,40,0.4);
+        border-radius: 16px;
+    }
+
+    .summary-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .summary-label {
+        font-size: 12px;
+        color: #aaaaaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 6px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px;
+        color: #888;
+    }
+
+    @media (max-width: 768px) {
+        .stats-summary {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<div class="charts-container">
+    <div class="page-header">
+        <h1>прогресс</h1>
+        <p>графики по всем видам тренировок</p>
+    </div>
+
+    <div class="sport-tabs">
+        <div class="sport-tab active" data-sport="running">
+            <i>🏃</i> бег
+        </div>
+        <div class="sport-tab" data-sport="cycling">
+            <i>🚴</i> вело
+        </div>
+        <div class="sport-tab" data-sport="swimming">
+            <i>🏊</i> плавание
+        </div>
+        <div class="sport-tab" data-sport="strength">
+            <i>🏋️</i> силовые
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h2 id="chartTitle">🏃 бег • дистанция</h2>
+            <div class="period-tabs">
+                <div class="period-tab active" data-period="week">неделя</div>
+                <div class="period-tab" data-period="month">месяц</div>
+                <div class="period-tab" data-period="year">год</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
+        </div>
+        <div class="stats-summary" id="statsSummary"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let currentSport = 'running';
+let currentPeriod = 'week';
+let mainChart = null;
+let allActivities = [];
+
+const sportNames = {
+    running: 'бег',
+    cycling: 'вело',
+    swimming: 'плавание',
+    strength: 'силовые'
+};
+
+const sportIcons = {
+    running: '🏃',
+    cycling: '🚴',
+    swimming: '🏊',
+    strength: '🏋️'
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        allActivities = await API.get('/api/activities');
+        renderChart();
+    } catch (e) {
+        console.error('Ошибка загрузки:', e);
+    }
+
+    document.querySelectorAll('.sport-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.sport-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentSport = tab.dataset.sport;
+            renderChart();
+        });
+    });
+
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentPeriod = tab.dataset.period;
+            renderChart();
+        });
+    });
+});
+
+function renderChart() {
+    const filtered = allActivities.filter(a => a.sport_type === currentSport);
+
+    document.getElementById('chartTitle').innerHTML = `${sportIcons[currentSport]} ${sportNames[currentSport]} • ${currentSport === 'strength' ? 'подходы' : 'дистанция'}`;
+
+    if (filtered.length === 0) {
+        document.getElementById('statsSummary').innerHTML = '<div class="empty-state" style="grid-column:1/-1;">нет данных</div>';
+        if (mainChart) mainChart.destroy();
+        return;
+    }
+
+    // Определяем период
+    let days = currentPeriod === 'week' ? 7 : (currentPeriod === 'month' ? 30 : 365);
+    const labels = [];
+    const data = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+
+        const dayActivities = filtered.filter(a => {
+            const aDate = new Date(a.start_time);
+            aDate.setHours(0, 0, 0, 0);
+            return aDate.getTime() === date.getTime();
+        });
+
+        let value = 0;
+        if (currentSport === 'strength') {
+            value = dayActivities.reduce((s, a) => s + (a.sets || 1), 0);
+        } else {
+            value = dayActivities.reduce((s, a) => s + (a.distance || 0), 0);
+            if (currentSport !== 'swimming') value = value / 1000;
+        }
+
+        labels.push(date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
+        data.push(value);
+    }
+
+    // Статистика за период
+    const periodActivities = filtered.filter(a => {
+        const aDate = new Date(a.start_time);
+        const daysAgo = (Date.now() - aDate.getTime()) / (1000 * 60 * 60 * 24);
+        return daysAgo <= days;
+    });
+
+    let totalValue = 0;
+    let totalTime = 0;
+    let totalCalories = 0;
+
+    if (currentSport === 'strength') {
+        totalValue = periodActivities.reduce((s, a) => s + (a.sets || 1), 0);
+    } else {
+        totalValue = periodActivities.reduce((s, a) => s + (a.distance || 0), 0);
+        if (currentSport !== 'swimming') totalValue = totalValue / 1000;
+    }
+
+    totalTime = periodActivities.reduce((s, a) => s + (a.duration || 0), 0);
+    totalCalories = periodActivities.reduce((s, a) => s + (a.calories || 0), 0);
+
+    const unit = currentSport === 'strength' ? 'подходов' : (currentSport === 'swimming' ? 'м' : 'км');
+
+    document.getElementById('statsSummary').innerHTML = `
+        <div class="summary-item">
+            <div class="summary-value">${totalValue.toFixed(currentSport === 'swimming' ? 0 : 1)}</div>
+            <div class="summary-label">${unit}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${Math.floor(totalTime / 60)}</div>
+            <div class="summary-label">минут</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${totalCalories}</div>
+            <div class="summary-label">ккал</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${periodActivities.length}</div>
+            <div class="summary-label">тренировок</div>
+        </div>
+    `;
+
+    // Рисуем график
+    if (mainChart) mainChart.destroy();
+
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    mainChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: unit,
+                data: data,
+                backgroundColor: '#a080ff',
+                borderRadius: 8,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a0a30',
+                    titleColor: '#fff',
+                    bodyColor: '#ccc'
+                }
+            },
+            scales: {
+                y: {
+                    grid: { color: '#2a1a4a' },
+                    ticks: { color: '#aaa' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#aaa' }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
