@@ -140,6 +140,7 @@
 
 <script>
 let currentGoal = null;
+let currentUserId = null;
 
 const sportConfig = {
     running: { unit: 'км', name: 'бег' },
@@ -148,12 +149,22 @@ const sportConfig = {
     strength: { unit: 'кг', name: 'силовые' }
 };
 
+async function getUserId() {
+    if (currentUserId) return currentUserId;
+    try {
+        const user = await API.get('/api/user');
+        currentUserId = user.id;
+        return user.id;
+    } catch (e) {
+        return null;
+    }
+}
+
 function updateFormForSport() {
     const sport = document.getElementById('sportType').value;
     if (sport === 'strength') {
         document.getElementById('cardioInputs').style.display = 'none';
         document.getElementById('strengthInputs').style.display = 'block';
-        document.getElementById('strengthTarget').value = 40;
     } else {
         document.getElementById('cardioInputs').style.display = 'block';
         document.getElementById('strengthInputs').style.display = 'none';
@@ -167,6 +178,8 @@ document.getElementById('sportType').addEventListener('change', updateFormForSpo
 
 function generateDetailedPlan(target, days, sport) {
     const plan = [];
+    const unit = sportConfig[sport]?.unit || '';
+
     if (sport === 'strength') {
         const phases = [
             { name: 'Адаптация', weeks: 1, intensity: 0.70, sets: 3, reps: 8 },
@@ -179,7 +192,7 @@ function generateDetailedPlan(target, days, sport) {
                 for (let d = 0; d < 7 && currentDay <= days; d++) {
                     if (d === 0 || d === 2 || d === 4) {
                         const weight = Math.round(target * phase.intensity / 2.5) * 2.5;
-                        plan.push({ day: currentDay, type: 'strength', value: weight, desc: `${phase.name}: жим лёжа ${phase.sets}x${phase.reps} с ${weight} кг.` });
+                        plan.push({ day: currentDay, type: 'strength', value: weight, desc: `${phase.name}: жим лёжа ${phase.sets}x${phase.reps} с ${weight} ${unit}.` });
                     } else {
                         plan.push({ day: currentDay, type: 'rest', value: 0, desc: d === 6 ? 'Полный отдых.' : 'Восстановление, лёгкое кардио.' });
                     }
@@ -191,7 +204,7 @@ function generateDetailedPlan(target, days, sport) {
         });
         while (currentDay <= days) {
             if (currentDay === days) {
-                plan.push({ day: currentDay, type: 'strength', value: target, desc: `🎯 Финальный тест! Пробуем поднять ${target} кг!` });
+                plan.push({ day: currentDay, type: 'strength', value: target, desc: `🎯 Финальный тест! Пробуем поднять ${target} ${unit}!` });
             } else {
                 plan.push({ day: currentDay, type: 'rest', value: 0, desc: 'Отдых перед финальным тестом.' });
             }
@@ -204,14 +217,15 @@ function generateDetailedPlan(target, days, sport) {
         let trainingsPlaced = 0;
         for (let day = 1; day <= days; day++) {
             if (day === days) {
-                plan.push({ day, type: 'running', value: target, desc: '🎯 Финальный день! Ты достиг цели!' });
+                plan.push({ day, type: sport, value: target, desc: `🎯 Финальный день! Ты достиг ${target} ${unit}!` });
                 break;
             }
             const remainingDays = days - day;
             const remainingTrainings = trainingDays - trainingsPlaced;
             const needTraining = trainingsPlaced < trainingDays && (trainingsPlaced === 0 || remainingTrainings >= remainingDays || day % 2 === 1);
             if (needTraining) {
-                plan.push({ day, type: 'running', value: Math.min(target, Math.round(currentVal * 10) / 10), desc: `Тренировка ${trainingsPlaced + 1}: работаем над прогрессом.` });
+                const val = Math.min(target, Math.round(currentVal * 10) / 10);
+                plan.push({ day, type: sport, value: val, desc: `Тренировка ${trainingsPlaced + 1}: работаем над прогрессом.` });
                 currentVal += step;
                 trainingsPlaced++;
             } else {
@@ -240,9 +254,9 @@ async function generateAIPlan() {
         const cfg = sportConfig[sport];
         let prompt;
         if (sport === 'strength') {
-            prompt = `Ты — тренер. Цель: поднять ${target} кг за ${days} дней. Оцени сложность (Лёгкая/Средняя/Высокая) и риск (Низкий/Умеренный/Высокий). Дай напутствие. Составь план с весами и подходами. Верни ТОЛЬКО JSON: {"difficulty":"Лёгкая","risk":"Низкий","comment":"Напутствие","plan":[{"day":1,"type":"strength","value":30,"desc":"Жим 3x8 с 30 кг."}]}`;
+            prompt = `Ты — тренер. Цель: поднять ${target} кг за ${days} дней. Оцени сложность (Лёгкая/Средняя/Высокая) и риск (Низкий/Умеренный/Высокий). Дай напутствие. Составь план с весами и подходами. Для каждого дня укажи type: "strength" или "rest". Верни ТОЛЬКО JSON: {"difficulty":"Лёгкая","risk":"Низкий","comment":"Напутствие","plan":[{"day":1,"type":"strength","value":30,"desc":"Жим 3x8 с 30 кг."}]}`;
         } else {
-            prompt = `Ты — тренер. Цель: ${target} ${cfg.unit} (${cfg.name}) за ${days} дней. Оцени сложность (Лёгкая/Средняя/Высокая) и риск (Низкий/Умеренный/Высокий). Дай напутствие. Составь план с чередованием отдыха. Верни ТОЛЬКО JSON: {"difficulty":"Лёгкая","risk":"Низкий","comment":"Напутствие","plan":[{"day":1,"type":"running","value":2,"desc":"Лёгкий бег."}]}`;
+            prompt = `Ты — тренер. Цель: ${target} ${cfg.unit} (${cfg.name}) за ${days} дней. Оцени сложность (Лёгкая/Средняя/Высокая) и риск (Низкий/Умеренный/Высокий). Дай напутствие. Составь план с чередованием отдыха. Для каждого дня укажи type: "${sport}" или "rest". Верни ТОЛЬКО JSON: {"difficulty":"Лёгкая","risk":"Низкий","comment":"Напутствие","plan":[{"day":1,"type":"${sport}","value":2,"desc":"Лёгкий бег."}]}`;
         }
 
         const res = await fetch('/api/ai/chat', {
@@ -277,7 +291,11 @@ async function generateAIPlan() {
     document.getElementById('difficulty').className = `assessment-value ${diff.includes('Лёгкая') ? 'status-easy' : diff.includes('Средняя') ? 'status-medium' : 'status-hard'}`;
     document.getElementById('riskLevel').className = `assessment-value ${risk.includes('Низкий') ? 'status-easy' : risk.includes('Умеренный') ? 'status-medium' : 'status-hard'}`;
 
-    localStorage.setItem('currentGoal', JSON.stringify(currentGoal));
+    const userId = await getUserId();
+    if (userId) {
+        localStorage.setItem(`goal_${userId}`, JSON.stringify(currentGoal));
+    }
+
     await fetch('/api/generate_plan', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -290,11 +308,12 @@ async function generateAIPlan() {
 
 function renderPlan() {
     if (!currentGoal) return;
-    const { target, days, plan, sport, startDate } = currentGoal;
-    const unit = sportConfig[sport]?.unit || '';
+    const { target, days, plan, startDate } = currentGoal;
+
     const start = startDate ? new Date(startDate) : new Date();
     const daysPassed = Math.floor((new Date() - start) / 86400000);
     const progress = Math.min(100, Math.max(0, (daysPassed / days) * 100));
+
     document.getElementById('progressFill').style.width = progress + '%';
     document.getElementById('progressText').textContent = Math.round(progress) + '%';
     document.getElementById('daysLeft').textContent = Math.max(0, days - daysPassed);
@@ -302,10 +321,43 @@ function renderPlan() {
     const container = document.getElementById('planDaysList');
     container.innerHTML = plan.map(d => {
         const isRest = d.type === 'rest';
-        const icon = sport === 'strength' ? '💪' : (isRest ? '🛌' : '🏃');
+
+        // Определяем единицу измерения по типу дня
+        let unit = 'км';
+        let icon = '🏃';
+
+        if (d.type === 'strength') {
+            unit = 'кг';
+            icon = '💪';
+        } else if (d.type === 'swimming') {
+            unit = 'м';
+            icon = '🏊';
+        } else if (d.type === 'cycling') {
+            unit = 'км';
+            icon = '🚴';
+        } else if (d.type === 'running') {
+            unit = 'км';
+            icon = '🏃';
+        } else if (isRest) {
+            unit = '';
+            icon = '🛌';
+        }
+
         const dayDate = new Date(start.getTime() + (d.day - 1) * 86400000);
         const dateStr = dayDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-        return `<div class="plan-day ${isRest ? 'rest' : ''}"><div class="plan-day-icon">${icon}</div><div class="plan-day-info"><div class="plan-day-title">День ${d.day} (${dateStr}): ${d.desc}</div><div class="plan-day-desc">${isRest ? '' : d.value + ' ' + unit}</div></div></div>`;
+
+        const val = d.value || d.distance || 0;
+        const valueWithUnit = isRest ? '' : `${val} ${unit}`;
+
+        return `
+            <div class="plan-day ${isRest ? 'rest' : ''}">
+                <div class="plan-day-icon">${icon}</div>
+                <div class="plan-day-info">
+                    <div class="plan-day-title">День ${d.day} (${dateStr}): ${d.desc}</div>
+                    <div class="plan-day-desc">${valueWithUnit}</div>
+                </div>
+            </div>
+        `;
     }).join('');
 }
 
@@ -313,12 +365,18 @@ async function deleteGoal() {
     if (!confirm('Удалить текущую цель?')) return;
     try { await fetch('/api/training_plan/delete', { method: 'DELETE' }); } catch (e) {}
     currentGoal = null;
-    localStorage.removeItem('currentGoal');
+    const userId = await getUserId();
+    if (userId) {
+        localStorage.removeItem(`goal_${userId}`);
+    }
     document.getElementById('planDisplay').style.display = 'none';
 }
 
 async function loadSavedGoal() {
-    const saved = localStorage.getItem('currentGoal');
+    const userId = await getUserId();
+    if (!userId) return;
+
+    const saved = localStorage.getItem(`goal_${userId}`);
     if (saved) {
         try {
             currentGoal = JSON.parse(saved);
@@ -332,7 +390,7 @@ async function loadSavedGoal() {
         const data = await res.json();
         if (data.plan && data.goal_distance) {
             currentGoal = { type: 'running', target: data.goal_distance, days: data.days || 14, plan: data.plan, startDate: new Date() };
-            localStorage.setItem('currentGoal', JSON.stringify(currentGoal));
+            localStorage.setItem(`goal_${userId}`, JSON.stringify(currentGoal));
             renderPlan();
             document.getElementById('planDisplay').style.display = 'block';
         }
