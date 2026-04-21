@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • рекорды{% endblock %}
+
+{% block content %}
+<style>
+    .records-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-header h1 {
+        font-size: 36px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -1px;
+    }
+
+    .page-header p {
+        color: #a090cc;
+        font-size: 16px;
+        margin-top: 8px;
+    }
+
+    .sport-section {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        border-radius: 24px;
+        padding: 24px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(140,100,255,0.15);
+    }
+
+    .sport-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(140,100,255,0.2);
+    }
+
+    .sport-icon {
+        font-size: 32px;
+    }
+
+    .sport-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .records-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .record-card {
+        background: rgba(20,10,40,0.6);
+        border-radius: 18px;
+        padding: 18px;
+        border: 1px solid rgba(140,100,255,0.1);
+    }
+
+    .record-label {
+        color: #a090cc;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+
+    .record-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+
+    .record-unit {
+        font-size: 14px;
+        color: #888;
+        margin-left: 5px;
+        font-weight: 400;
+    }
+
+    .record-date {
+        color: #666;
+        font-size: 12px;
+        margin-top: 8px;
+    }
+
+    .empty-records {
+        text-align: center;
+        padding: 60px 20px;
+        color: #888;
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        border-radius: 24px;
+        border: 1px solid rgba(140,100,255,0.15);
+    }
+
+    .trophy-icon {
+        font-size: 60px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    @media (max-width: 500px) {
+        .records-grid {
+            grid-template-columns: 1fr;
+        }
+        .record-value {
+            font-size: 28px;
+        }
+    }
+</style>
+
+<div class="records-container">
+    <div class="page-header">
+        <h1>🏆 рекорды</h1>
+        <p>твои лучшие достижения</p>
+    </div>
+
+    <div id="recordsContent">
+        <div class="empty-records">
+            <div class="trophy-icon">🏃</div>
+            <p>загрузка рекордов...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const sportNames = {
+    running: '🏃 Бег',
+    cycling: '🚴 Велосипед',
+    swimming: '🏊 Плавание',
+    strength: '🏋️ Силовые'
+};
+
+const distanceLabels = {
+    '1': '1 км',
+    '5': '5 км',
+    '10': '10 км',
+    '21.1': 'Полумарафон',
+    '42.2': 'Марафон'
+};
+
+const recordTypeLabels = {
+    'max_distance': 'Макс. дистанция',
+    'max_speed': 'Макс. скорость',
+    'max_sets': 'Макс. подходов',
+    'max_duration': 'Макс. длительность',
+    'distance': ''
+};
+
+function formatTime(seconds) {
+    if (!seconds || seconds <= 0) return '—';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatValue(record) {
+    if (record.record_type === 'distance') {
+        return formatTime(record.value);
+    } else if (record.record_type === 'max_speed') {
+        return record.value.toFixed(1) + ' км/ч';
+    } else if (record.record_type === 'max_distance') {
+        if (record.sport_type === 'swimming') {
+            return Math.round(record.value) + ' м';
+        }
+        return record.value.toFixed(2) + ' км';
+    } else if (record.record_type === 'max_sets') {
+        return Math.round(record.value) + ' подх.';
+    } else if (record.record_type === 'max_duration') {
+        return Math.round(record.value) + ' мин';
+    }
+    return record.value;
+}
+
+function getRecordLabel(record) {
+    if (record.record_type === 'distance' && record.distance_km) {
+        return distanceLabels[record.distance_km] || `${record.distance_km} км`;
+    }
+    return recordTypeLabels[record.record_type] || record.record_type;
+}
+
+async function loadRecords() {
+    const container = document.getElementById('recordsContent');
+
+    try {
+        const response = await fetch('/api/personal_records');
+
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки');
+        }
+
+        const records = await response.json();
+
+        if (!records || records.length === 0) {
+            container.innerHTML = `
+                <div class="empty-records">
+                    <div class="trophy-icon">🏆</div>
+                    <p>пока нет рекордов</p>
+                    <p style="font-size: 14px; margin-top: 8px;">начни тренироваться, чтобы установить первый рекорд!</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Группируем по видам спорта
+        const grouped = {};
+        records.forEach(r => {
+            if (!grouped[r.sport_type]) {
+                grouped[r.sport_type] = [];
+            }
+            grouped[r.sport_type].push(r);
+        });
+
+        let html = '';
+
+        // Сортируем виды спорта в нужном порядке
+        const sportOrder = ['running', 'cycling', 'swimming', 'strength'];
+
+        sportOrder.forEach(sport => {
+            const sportRecords = grouped[sport];
+            if (!sportRecords || sportRecords.length === 0) return;
+
+            // Сортируем рекорды внутри вида спорта
+            sportRecords.sort((a, b) => {
+                // Сначала по типу рекорда
+                if (a.record_type !== b.record_type) {
+                    const order = ['distance', 'max_distance', 'max_speed', 'max_sets', 'max_duration'];
+                    return order.indexOf(a.record_type) - order.indexOf(b.record_type);
+                }
+                // Для дистанций — по возрастанию км
+                if (a.record_type === 'distance') {
+                    return (a.distance_km || 0) - (b.distance_km || 0);
+                }
+                return 0;
+            });
+
+            const sportIcon = sport === 'running' ? '🏃' :
+                             sport === 'cycling' ? '🚴' :
+                             sport === 'swimming' ? '🏊' : '🏋️';
+
+            html += `
+                <div class="sport-section">
+                    <div class="sport-header">
+                        <span class="sport-icon">${sportIcon}</span>
+                        <span class="sport-name">${sportNames[sport]}</span>
+                    </div>
+                    <div class="records-grid">
+            `;
+
+            sportRecords.forEach(r => {
+                const date = r.achieved_at ? new Date(r.achieved_at).toLocaleDateString('ru-RU', {
+                    day: 'numeric', month: 'long', year: 'numeric'
+                }) : '';
+
+                html += `
+                    <div class="record-card">
+                        <div class="record-label">${getRecordLabel(r)}</div>
+                        <div class="record-value">${formatValue(r)}</div>
+                        ${date ? `<div class="record-date">${date}</div>` : ''}
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+    } catch (e) {
+        console.error('Ошибка загрузки рекордов:', e);
+        container.innerHTML = `
+            <div class="empty-records">
+                <div class="trophy-icon">🏆</div>
+                <p>пока нет рекордов</p>
+                <p style="font-size: 14px; margin-top: 8px;">начни тренироваться!</p>
+            </div>
+        `;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadRecords);
+</script>
+{% endblock %}

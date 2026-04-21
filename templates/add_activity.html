@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+
+{% block title %}Fit • добавить тренировку{% endblock %}
+
+{% block content %}
+<style>
+    .add-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 0 12px;
+    }
+
+    .add-card {
+        background: linear-gradient(135deg, #1a0a30, #0a0218);
+        backdrop-filter: blur(15px);
+        border-radius: 28px;
+        padding: 24px 18px;
+        border: 1px solid rgba(140,100,255,0.2);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        animation: fadeUp 0.5s ease;
+    }
+
+    .add-title {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        letter-spacing: -0.5px;
+    }
+
+    .sport-selector {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 24px;
+    }
+
+    .sport-option {
+        padding: 12px 4px;
+        background: linear-gradient(135deg, #150a28, #080218);
+        border: 1px solid rgba(140,100,255,0.15);
+        border-radius: 14px;
+        color: #aaaaaa;
+        font-size: 20px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .sport-option.active {
+        background: linear-gradient(135deg, #3a1a5a, #1a0a3a);
+        color: #ffffff;
+        border-color: rgba(180,140,255,0.5);
+        box-shadow: 0 8px 20px rgba(100,60,200,0.2);
+    }
+
+    .sport-option span {
+        display: block;
+        font-size: 10px;
+        margin-top: 3px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .form-group {
+        margin-bottom: 18px;
+    }
+
+    .form-group label {
+        display: block;
+        color: #bbbbbb;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 14px;
+        background: rgba(10,5,25,0.8);
+        border: 1px solid rgba(140,100,255,0.2);
+        border-radius: 14px;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 500;
+        outline: none;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: rgba(180,140,255,0.6);
+        box-shadow: 0 0 15px rgba(100,60,200,0.2);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .exercises-title {
+        color: #bbbbbb;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 16px 0 10px;
+    }
+
+    .exercise-item {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+        align-items: center;
+    }
+
+    .exercise-name {
+        flex: 2;
+        min-width: 100px;
+    }
+
+    .exercise-reps {
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .exercise-weight {
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .exercise-item input {
+        padding: 10px 8px;
+        background: rgba(10,5,25,0.8);
+        border: 1px solid rgba(140,100,255,0.2);
+        border-radius: 12px;
+        color: #ffffff;
+        font-size: 13px;
+        width: 100%;
+    }
+
+    .exercise-item input::placeholder {
+        font-size: 11px;
+        color: #666;
+    }
+
+    .remove-exercise {
+        background: rgba(200,60,60,0.2);
+        border: 1px solid rgba(200,60,60,0.3);
+        border-radius: 10px;
+        color: #ff8080;
+        font-size: 14px;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .remove-exercise:hover {
+        background: rgba(200,60,60,0.4);
+    }
+
+    .add-exercise-btn {
+        width: 100%;
+        padding: 12px;
+        background: transparent;
+        border: 1px dashed rgba(140,100,255,0.4);
+        border-radius: 14px;
+        color: #a090cc;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        margin-top: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .add-exercise-btn:hover {
+        border-color: rgba(180,140,255,0.8);
+        color: #ffffff;
+        background: rgba(30,15,50,0.5);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 15px;
+        background: linear-gradient(135deg, #3a1a5a, #1a0a3a);
+        border: 1px solid rgba(180,140,255,0.3);
+        border-radius: 50px;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 25px rgba(100,60,200,0.2);
+    }
+
+    .submit-btn:hover {
+        background: linear-gradient(135deg, #4a2a6a, #2a1a4a);
+        transform: translateY(-2px);
+        box-shadow: 0 15px 30px rgba(100,60,200,0.3);
+    }
+
+    .error-message {
+        color: #ff6666;
+        font-size: 12px;
+        margin-top: 4px;
+        display: none;
+    }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 400px) {
+        .sport-option { font-size: 18px; }
+        .sport-option span { font-size: 9px; }
+        .add-card { padding: 20px 14px; }
+        .add-title { font-size: 22px; }
+    }
+</style>
+
+<div class="add-container">
+    <a href="/activities" style="color: #a090cc; text-decoration: none; margin-bottom: 14px; display: inline-block; font-weight: 600; font-size: 14px;">← назад</a>
+
+    <div class="add-card">
+        <h2 class="add-title">новая тренировка</h2>
+
+        <div class="sport-selector">
+            <div class="sport-option active" data-sport="running">
+                🏃<span>бег</span>
+            </div>
+            <div class="sport-option" data-sport="cycling">
+                🚴<span>вело</span>
+            </div>
+            <div class="sport-option" data-sport="swimming">
+                🏊<span>плавание</span>
+            </div>
+            <div class="sport-option" data-sport="strength">
+                🏋️<span>силовая</span>
+            </div>
+        </div>
+
+        <form id="activityForm">
+            <div id="dynamicFields"></div>
+
+            <div class="form-group">
+                <label>дата</label>
+                <input type="date" name="date" id="dateInput" required>
+            </div>
+
+            <div id="exercisesContainer"></div>
+
+            <div class="form-group">
+                <label>заметки</label>
+                <textarea name="notes" rows="2" placeholder="как прошла тренировка?"></textarea>
+            </div>
+
+            <div id="validationError" class="error-message"></div>
+
+            <button type="submit" class="submit-btn">сохранить</button>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentSport = 'running';
+let exercises = [];
+
+// Лимиты для валидации
+const LIMITS = {
+    running: { maxDist: 100, maxPace: 120, minPace: 7200 },  // 7200 сек/км = 2:00:00/км
+    cycling: { maxDist: 300, maxSpeed: 60 },
+    swimming: { maxDist: 10000, maxPace: 40 },
+    strength: { maxSets: 100 }
+};
+
+function validateData(data) {
+    const errors = [];
+
+    if (data.duration <= 0) {
+        errors.push('Длительность должна быть больше 0');
+    }
+    if (data.duration > 86400) {
+        errors.push('Длительность не может быть больше 24 часов');
+    }
+
+    if (currentSport === 'running') {
+        const distKm = data.distance / 1000;
+        if (distKm <= 0) errors.push('Дистанция должна быть больше 0');
+        if (distKm > LIMITS.running.maxDist) errors.push(`Дистанция не может быть больше ${LIMITS.running.maxDist} км`);
+        if (distKm > 0 && data.duration > 0) {
+            const pace = data.duration / distKm;
+            if (pace < LIMITS.running.maxPace) errors.push('Нереалистичный темп (быстрее 2:00/км)');
+            if (pace > LIMITS.running.minPace) errors.push('Нереалистичный темп (медленнее 2:00:00/км)');
+        }
+    } else if (currentSport === 'cycling') {
+        const distKm = data.distance / 1000;
+        if (distKm <= 0) errors.push('Дистанция должна быть больше 0');
+        if (distKm > LIMITS.cycling.maxDist) errors.push(`Дистанция не может быть больше ${LIMITS.cycling.maxDist} км`);
+        if (distKm > 0 && data.duration > 0) {
+            const speed = distKm / (data.duration / 3600);
+            if (speed > LIMITS.cycling.maxSpeed) errors.push(`Нереалистичная скорость (>${LIMITS.cycling.maxSpeed} км/ч)`);
+        }
+    } else if (currentSport === 'swimming') {
+        if (data.distance <= 0) errors.push('Дистанция должна быть больше 0');
+        if (data.distance > LIMITS.swimming.maxDist) errors.push(`Дистанция не может быть больше ${LIMITS.swimming.maxDist/1000} км`);
+        if (data.distance > 0 && data.duration > 0) {
+            const pace = data.duration / (data.distance / 100);
+            if (pace < LIMITS.swimming.maxPace) errors.push(`Нереалистичный темп (быстрее ${LIMITS.swimming.maxPace} сек/100м)`);
+        }
+    } else if (currentSport === 'strength') {
+        if (exercises.length === 0 || exercises.every(e => !e.name)) {
+            errors.push('Добавьте хотя бы одно упражнение');
+        }
+        if (exercises.length > LIMITS.strength.maxSets) {
+            errors.push(`Нереалистичное количество упражнений (>${LIMITS.strength.maxSets})`);
+        }
+    }
+
+    return errors;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    document.getElementById('dateInput').value = now.toISOString().split('T')[0];
+    updateFormFields();
+
+    document.querySelectorAll('.sport-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            document.querySelectorAll('.sport-option').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            currentSport = opt.dataset.sport;
+            updateFormFields();
+        });
+    });
+
+    document.getElementById('activityForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const errorDiv = document.getElementById('validationError');
+        errorDiv.style.display = 'none';
+
+        const formData = new FormData(e.target);
+        const startTime = new Date(`${formData.get('date')}T12:00:00`);
+        const durationMin = parseInt(formData.get('duration') || '0');
+
+        const data = {
+            sport_type: currentSport,
+            start_time: startTime.toISOString(),
+            notes: formData.get('notes'),
+            duration: durationMin * 60
+        };
+
+        if (currentSport === 'running' || currentSport === 'cycling') {
+            data.distance = parseFloat(formData.get('distance') || '0') * 1000;
+        } else if (currentSport === 'swimming') {
+            data.distance = parseFloat(formData.get('distance') || '0');
+        } else if (currentSport === 'strength') {
+            data.exercises = JSON.stringify(exercises.filter(e => e.name));
+            data.sets = exercises.filter(e => e.name).length;
+        }
+
+        // Валидация
+        const errors = validateData(data);
+        if (errors.length > 0) {
+            errorDiv.textContent = '❌ ' + errors.join('; ');
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        try {
+            await API.post('/api/activities/manual', data);
+            window.location.href = '/activities';
+        } catch (e) {
+            errorDiv.textContent = '❌ ' + (e.message || 'Ошибка сохранения');
+            errorDiv.style.display = 'block';
+        }
+    });
+});
+
+function updateFormFields() {
+    const container = document.getElementById('dynamicFields');
+    const exContainer = document.getElementById('exercisesContainer');
+
+    if (currentSport === 'running' || currentSport === 'cycling') {
+        const unit = currentSport === 'running' ? 'км' : 'км';
+        container.innerHTML = `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>дистанция (${unit})</label>
+                    <input type="number" name="distance" step="0.01" min="0.1" max="${currentSport === 'running' ? 100 : 300}" required>
+                </div>
+                <div class="form-group">
+                    <label>время (мин)</label>
+                    <input type="number" name="duration" min="1" max="1440" required>
+                </div>
+            </div>
+        `;
+        exContainer.innerHTML = '';
+    } else if (currentSport === 'swimming') {
+        container.innerHTML = `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>дистанция (м)</label>
+                    <input type="number" name="distance" min="50" max="10000" required>
+                </div>
+                <div class="form-group">
+                    <label>время (мин)</label>
+                    <input type="number" name="duration" min="1" max="1440" required>
+                </div>
+            </div>
+        `;
+        exContainer.innerHTML = '';
+    } else if (currentSport === 'strength') {
+        container.innerHTML = `
+            <div class="form-group">
+                <label>общее время (мин)</label>
+                <input type="number" name="duration" min="5" max="300" required>
+            </div>
+        `;
+        renderExercises();
+    }
+}
+
+function renderExercises() {
+    const container = document.getElementById('exercisesContainer');
+    if (exercises.length === 0) {
+        exercises.push({ name: '', reps: '', weight: '' });
+    }
+
+    let html = '<div class="exercises-title">упражнения</div>';
+
+    exercises.forEach((ex, i) => {
+        html += `
+            <div class="exercise-item">
+                <input type="text" placeholder="упражнение" value="${ex.name}" data-index="${i}" class="ex-name" style="flex:2;">
+                <input type="number" placeholder="повт" value="${ex.reps}" data-index="${i}" class="ex-reps" style="flex:1;" min="1" max="100">
+                <input type="number" placeholder="вес" value="${ex.weight}" data-index="${i}" class="ex-weight" style="flex:1;" min="0" max="500">
+                <button type="button" class="remove-exercise" data-index="${i}">✕</button>
+            </div>
+        `;
+    });
+
+    html += '<button type="button" class="add-exercise-btn">+ добавить упражнение</button>';
+    container.innerHTML = html;
+
+    container.querySelector('.add-exercise-btn').onclick = () => {
+        exercises.push({ name: '', reps: '', weight: '' });
+        renderExercises();
+    };
+
+    container.querySelectorAll('.ex-name').forEach(i => i.addEventListener('input', (e) => exercises[e.target.dataset.index].name = e.target.value));
+    container.querySelectorAll('.ex-reps').forEach(i => i.addEventListener('input', (e) => exercises[e.target.dataset.index].reps = e.target.value));
+    container.querySelectorAll('.ex-weight').forEach(i => i.addEventListener('input', (e) => exercises[e.target.dataset.index].weight = e.target.value));
+    container.querySelectorAll('.remove-exercise').forEach(b => b.addEventListener('click', (e) => {
+        exercises.splice(e.target.dataset.index, 1);
+        if (exercises.length === 0) exercises.push({ name: '', reps: '', weight: '' });
+        renderExercises();
+    }));
+}
+</script>
+{% endblock %}
