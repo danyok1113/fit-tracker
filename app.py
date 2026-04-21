@@ -7,6 +7,7 @@ import math
 import random
 import requests
 import json
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key'
@@ -93,36 +94,55 @@ def calculate_load_index(user_id):
         if a.sport_type == 'running':
             if a.distance > 0 and a.duration > 0:
                 pace_min_per_km = (a.duration / (a.distance / 1000)) / 60
-                if pace_min_per_km < 4.0: intensity = 2.5
-                elif pace_min_per_km < 5.0: intensity = 2.0
-                elif pace_min_per_km < 6.0: intensity = 1.5
-                elif pace_min_per_km < 7.0: intensity = 1.0
-                elif pace_min_per_km < 9.0: intensity = 0.7
-                else: intensity = 0.4
+                if pace_min_per_km < 4.0:
+                    intensity = 2.5
+                elif pace_min_per_km < 5.0:
+                    intensity = 2.0
+                elif pace_min_per_km < 6.0:
+                    intensity = 1.5
+                elif pace_min_per_km < 7.0:
+                    intensity = 1.0
+                elif pace_min_per_km < 9.0:
+                    intensity = 0.7
+                else:
+                    intensity = 0.4
 
         elif a.sport_type == 'cycling':
             if a.distance > 0 and a.duration > 0:
                 speed_kmh = (a.distance / 1000) / (a.duration / 3600)
-                if speed_kmh > 30: intensity = 2.0
-                elif speed_kmh > 25: intensity = 1.5
-                elif speed_kmh > 20: intensity = 1.0
-                elif speed_kmh > 15: intensity = 0.7
-                else: intensity = 0.4
+                if speed_kmh > 30:
+                    intensity = 2.0
+                elif speed_kmh > 25:
+                    intensity = 1.5
+                elif speed_kmh > 20:
+                    intensity = 1.0
+                elif speed_kmh > 15:
+                    intensity = 0.7
+                else:
+                    intensity = 0.4
 
         elif a.sport_type == 'swimming':
             if a.distance > 0 and a.duration > 0:
                 pace_sec_per_100m = a.duration / (a.distance / 100)
-                if pace_sec_per_100m < 90: intensity = 2.0
-                elif pace_sec_per_100m < 120: intensity = 1.5
-                elif pace_sec_per_100m < 150: intensity = 1.0
-                else: intensity = 0.6
+                if pace_sec_per_100m < 90:
+                    intensity = 2.0
+                elif pace_sec_per_100m < 120:
+                    intensity = 1.5
+                elif pace_sec_per_100m < 150:
+                    intensity = 1.0
+                else:
+                    intensity = 0.6
 
         elif a.sport_type == 'strength':
             sets = a.sets or 1
-            if sets > 20: intensity = 2.0
-            elif sets > 12: intensity = 1.5
-            elif sets > 6: intensity = 1.0
-            else: intensity = 0.6
+            if sets > 20:
+                intensity = 2.0
+            elif sets > 12:
+                intensity = 1.5
+            elif sets > 6:
+                intensity = 1.0
+            else:
+                intensity = 0.6
 
         total_load += duration_min * intensity
 
@@ -131,10 +151,14 @@ def calculate_load_index(user_id):
     rest_days = 7 - training_days
     recovery_index = min(100, max(20, 100 - load_index + rest_days * 5))
 
-    if load_index > 70: status, message = 'overtraining', 'Высокая нагрузка, нужен отдых'
-    elif load_index > 50: status, message = 'optimal', 'Оптимальная нагрузка'
-    elif load_index > 30: status, message = 'normal', 'Хорошая активность'
-    else: status, message = 'low', 'Можно увеличить нагрузку'
+    if load_index > 70:
+        status, message = 'overtraining', 'Высокая нагрузка, нужен отдых'
+    elif load_index > 50:
+        status, message = 'optimal', 'Оптимальная нагрузка'
+    elif load_index > 30:
+        status, message = 'normal', 'Хорошая активность'
+    else:
+        status, message = 'low', 'Можно увеличить нагрузку'
 
     return {'load': load_index, 'recovery': recovery_index, 'status': status, 'message': message}
 
@@ -154,6 +178,7 @@ class User(UserMixin, db.Model):
     chat_messages = db.relationship('ChatMessage', backref='user', lazy=True)
 
     def set_password(self, password): self.password_hash = generate_password_hash(password)
+
     def check_password(self, password): return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
@@ -175,7 +200,8 @@ class ChatMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        return {'id': self.id, 'message': self.message, 'is_user': self.is_user, 'created_at': self.created_at.isoformat()}
+        return {'id': self.id, 'message': self.message, 'is_user': self.is_user,
+                'created_at': self.created_at.isoformat()}
 
 
 class Activity(db.Model):
@@ -228,6 +254,17 @@ class PersonalRecord(db.Model):
     achieved_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class TrainingPlan(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    goal_distance = db.Column(db.Float, nullable=False)
+    days = db.Column(db.Integer, nullable=False)
+    plan_data = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    end_date = db.Column(db.DateTime)
+    completed_days = db.Column(db.Text, default='[]')
+
+
 @login_manager.user_loader
 def load_user(user_id): return db.session.get(User, int(user_id))
 
@@ -237,43 +274,68 @@ def check_and_save_all_records(user_id, activity):
 
     if activity.sport_type == 'running':
         distance_km = activity.distance / 1000
-        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='running', record_type='max_distance').first()
+        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='running',
+                                                  record_type='max_distance').first()
         if not max_dist or distance_km > max_dist.value:
-            if max_dist: max_dist.value = distance_km; max_dist.achieved_at = datetime.utcnow()
-            else: db.session.add(PersonalRecord(user_id=user_id, sport_type='running', record_type='max_distance', value=distance_km, activity_id=activity.id))
+            if max_dist:
+                max_dist.value = distance_km; max_dist.achieved_at = datetime.utcnow()
+            else:
+                db.session.add(
+                    PersonalRecord(user_id=user_id, sport_type='running', record_type='max_distance', value=distance_km,
+                                   activity_id=activity.id))
             new_records.append({'type': 'running', 'max_distance': distance_km})
 
         for rec_dist in [1, 5, 10, 21.1, 42.2]:
             if distance_km >= rec_dist * 0.98:
                 time_for_distance = int(activity.duration * (rec_dist / distance_km))
-                existing = PersonalRecord.query.filter_by(user_id=user_id, sport_type='running', record_type='distance', distance_km=rec_dist).first()
+                existing = PersonalRecord.query.filter_by(user_id=user_id, sport_type='running', record_type='distance',
+                                                          distance_km=rec_dist).first()
                 if not existing or time_for_distance < existing.value:
-                    if existing: existing.value = time_for_distance; existing.achieved_at = datetime.utcnow()
-                    else: db.session.add(PersonalRecord(user_id=user_id, sport_type='running', record_type='distance', distance_km=rec_dist, value=time_for_distance, activity_id=activity.id))
+                    if existing:
+                        existing.value = time_for_distance; existing.achieved_at = datetime.utcnow()
+                    else:
+                        db.session.add(PersonalRecord(user_id=user_id, sport_type='running', record_type='distance',
+                                                      distance_km=rec_dist, value=time_for_distance,
+                                                      activity_id=activity.id))
                     new_records.append({'type': 'running', 'distance': rec_dist, 'time': time_for_distance})
 
     elif activity.sport_type == 'cycling':
         distance_km = activity.distance / 1000
-        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='cycling', record_type='max_distance').first()
+        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='cycling',
+                                                  record_type='max_distance').first()
         if not max_dist or distance_km > max_dist.value:
-            if max_dist: max_dist.value = distance_km; max_dist.achieved_at = datetime.utcnow()
-            else: db.session.add(PersonalRecord(user_id=user_id, sport_type='cycling', record_type='max_distance', value=distance_km, activity_id=activity.id))
+            if max_dist:
+                max_dist.value = distance_km; max_dist.achieved_at = datetime.utcnow()
+            else:
+                db.session.add(
+                    PersonalRecord(user_id=user_id, sport_type='cycling', record_type='max_distance', value=distance_km,
+                                   activity_id=activity.id))
             new_records.append({'type': 'cycling', 'max_distance': distance_km})
 
     elif activity.sport_type == 'swimming':
         distance_m = activity.distance
-        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='swimming', record_type='max_distance').first()
+        max_dist = PersonalRecord.query.filter_by(user_id=user_id, sport_type='swimming',
+                                                  record_type='max_distance').first()
         if not max_dist or distance_m > max_dist.value:
-            if max_dist: max_dist.value = distance_m; max_dist.achieved_at = datetime.utcnow()
-            else: db.session.add(PersonalRecord(user_id=user_id, sport_type='swimming', record_type='max_distance', value=distance_m, activity_id=activity.id))
+            if max_dist:
+                max_dist.value = distance_m; max_dist.achieved_at = datetime.utcnow()
+            else:
+                db.session.add(
+                    PersonalRecord(user_id=user_id, sport_type='swimming', record_type='max_distance', value=distance_m,
+                                   activity_id=activity.id))
             new_records.append({'type': 'swimming', 'max_distance': distance_m})
 
     elif activity.sport_type == 'strength':
         sets_count = activity.sets or 0
-        max_sets = PersonalRecord.query.filter_by(user_id=user_id, sport_type='strength', record_type='max_sets').first()
+        max_sets = PersonalRecord.query.filter_by(user_id=user_id, sport_type='strength',
+                                                  record_type='max_sets').first()
         if not max_sets or sets_count > max_sets.value:
-            if max_sets: max_sets.value = sets_count; max_sets.achieved_at = datetime.utcnow()
-            else: db.session.add(PersonalRecord(user_id=user_id, sport_type='strength', record_type='max_sets', value=sets_count, activity_id=activity.id))
+            if max_sets:
+                max_sets.value = sets_count; max_sets.achieved_at = datetime.utcnow()
+            else:
+                db.session.add(
+                    PersonalRecord(user_id=user_id, sport_type='strength', record_type='max_sets', value=sets_count,
+                                   activity_id=activity.id))
             new_records.append({'type': 'strength', 'max_sets': sets_count})
 
     if new_records: db.session.commit()
@@ -292,7 +354,8 @@ def validate_activity(sport_type, distance, duration, sets):
         if dist_km > 0 and duration > 0:
             pace_min_per_km = (duration / (distance / 1000)) / 60
             if pace_min_per_km < 3.0:
-                errors.append(f'❌ Нереалистичный темп ({pace_min_per_km:.2f}/км). Мировой рекорд — 2:30/км на коротких дистанциях.')
+                errors.append(
+                    f'❌ Нереалистичный темп ({pace_min_per_km:.2f}/км). Мировой рекорд — 2:30/км на коротких дистанциях.')
             elif pace_min_per_km < 3.5 and dist_km > 21:
                 errors.append(f'❌ Нереалистичный темп ({pace_min_per_km:.2f}/км) для дистанции {dist_km:.1f} км.')
             elif pace_min_per_km < 4.0 and dist_km > 42:
@@ -333,14 +396,17 @@ def validate_activity(sport_type, distance, duration, sets):
 def register():
     try:
         data = request.json
-        if User.query.filter_by(username=data['username']).first(): return jsonify({'error': 'Пользователь уже существует'}), 400
+        if User.query.filter_by(username=data['username']).first(): return jsonify(
+            {'error': 'Пользователь уже существует'}), 400
         user = User(username=data['username'], name=data.get('name', ''))
         user.set_password(data['password'])
-        db.session.add(user); db.session.commit()
+        db.session.add(user);
+        db.session.commit()
         login_user(user)
         return jsonify(user.to_dict())
     except Exception as e:
-        db.session.rollback(); return jsonify({'error': str(e)}), 500
+        db.session.rollback();
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/login', methods=['POST'])
@@ -350,7 +416,8 @@ def login():
         user = User.query.filter_by(username=data['username']).first()
         if user and user.check_password(data['password']): login_user(user); return jsonify(user.to_dict())
         return jsonify({'error': 'Неверный логин или пароль'}), 401
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -374,7 +441,8 @@ def update_user_params():
         current_user.goal = data.get('goal', current_user.goal)
         db.session.commit()
         return jsonify({'message': 'OK'})
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/user/load_index', methods=['GET'])
@@ -386,12 +454,15 @@ def get_load_index(): return jsonify(calculate_load_index(current_user.id))
 @login_required
 def get_user_stats():
     activities = Activity.query.filter_by(user_id=current_user.id).all()
-    stats = {'running': {'distance': 0, 'calories': 0, 'count': 0}, 'cycling': {'distance': 0, 'calories': 0, 'count': 0},
+    stats = {'running': {'distance': 0, 'calories': 0, 'count': 0},
+             'cycling': {'distance': 0, 'calories': 0, 'count': 0},
              'swimming': {'distance': 0, 'calories': 0, 'count': 0}, 'strength': {'count': 0, 'calories': 0, 'sets': 0}}
     for a in activities:
         if a.sport_type in stats:
-            if a.sport_type == 'strength': stats['strength']['count'] += 1; stats['strength']['sets'] += a.sets or 0
-            else: stats[a.sport_type]['distance'] += a.distance; stats[a.sport_type]['count'] += 1
+            if a.sport_type == 'strength':
+                stats['strength']['count'] += 1; stats['strength']['sets'] += a.sets or 0
+            else:
+                stats[a.sport_type]['distance'] += a.distance; stats[a.sport_type]['count'] += 1
             stats[a.sport_type]['calories'] += a.calories or 0
     return jsonify(stats)
 
@@ -438,7 +509,8 @@ def create_activity():
                             distance=distance, duration=duration, calories=0, sets=sets,
                             exercises=json.dumps(data.get('exercises', [])) if data.get('exercises') else '',
                             start_time=datetime.fromisoformat(start_str), notes=data.get('notes', ''))
-        db.session.add(activity); db.session.flush()
+        db.session.add(activity);
+        db.session.flush()
         for point in data.get('track_points', []):
             db.session.add(TrackPoint(activity_id=activity.id, latitude=point['latitude'], longitude=point['longitude'],
                                       timestamp=datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00'))))
@@ -449,10 +521,13 @@ def create_activity():
             activity.avg_speed = (activity.distance / 1000) / (activity.duration / 3600)
             db.session.commit()
         new_records = check_and_save_all_records(current_user.id, activity)
-        result = activity.to_dict(); result['new_records'] = new_records
+        result = activity.to_dict();
+        result['new_records'] = new_records
         return jsonify(result)
     except Exception as e:
-        print(f"Ошибка: {e}"); db.session.rollback(); return jsonify({'error': str(e)}), 500
+        print(f"Ошибка: {e}");
+        db.session.rollback();
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/activities/<int:activity_id>', methods=['DELETE'])
@@ -460,7 +535,8 @@ def create_activity():
 def delete_activity(activity_id):
     activity = Activity.query.get_or_404(activity_id)
     if activity.user_id != current_user.id: return jsonify({'error': 'Access denied'}), 403
-    db.session.delete(activity); db.session.commit()
+    db.session.delete(activity);
+    db.session.commit()
     return jsonify({'message': 'Deleted'})
 
 
@@ -486,7 +562,8 @@ def create_manual_activity():
                             notes=data.get('notes', ''), sets=sets,
                             exercises=json.dumps(data.get('exercises', [])) if data.get('exercises') else '')
         if data.get('weight'): current_user.weight = data['weight']
-        db.session.add(activity); db.session.flush()
+        db.session.add(activity);
+        db.session.flush()
         activity.calories = calculate_calories(current_user, activity)
         db.session.commit()
         if activity.duration > 0 and activity.distance > 0 and activity.sport_type in ['running', 'cycling']:
@@ -494,9 +571,11 @@ def create_manual_activity():
             activity.avg_speed = (activity.distance / 1000) / (activity.duration / 3600)
             db.session.commit()
         new_records = check_and_save_all_records(current_user.id, activity)
-        result = activity.to_dict(); result['new_records'] = new_records
+        result = activity.to_dict();
+        result['new_records'] = new_records
         return jsonify(result)
-    except Exception as e: db.session.rollback(); return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        db.session.rollback(); return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/activities/<int:activity_id>/points')
@@ -505,13 +584,16 @@ def get_activity_points(activity_id):
     activity = Activity.query.get_or_404(activity_id)
     if activity.user_id != current_user.id: return jsonify({'error': 'Access denied'}), 403
     points = TrackPoint.query.filter_by(activity_id=activity_id).order_by(TrackPoint.timestamp).all()
-    return jsonify([{'latitude': p.latitude, 'longitude': p.longitude, 'timestamp': p.timestamp.isoformat()} for p in points])
+    return jsonify(
+        [{'latitude': p.latitude, 'longitude': p.longitude, 'timestamp': p.timestamp.isoformat()} for p in points])
 
 
 @app.route('/api/personal_records', methods=['GET'])
 @login_required
 def get_personal_records():
-    records = PersonalRecord.query.filter_by(user_id=current_user.id).order_by(PersonalRecord.sport_type, PersonalRecord.record_type, PersonalRecord.distance_km).all()
+    records = PersonalRecord.query.filter_by(user_id=current_user.id).order_by(PersonalRecord.sport_type,
+                                                                               PersonalRecord.record_type,
+                                                                               PersonalRecord.distance_km).all()
     result = []
     for r in records:
         item = {'id': r.id, 'sport_type': r.sport_type, 'record_type': r.record_type, 'value': r.value,
@@ -519,6 +601,59 @@ def get_personal_records():
         if r.distance_km: item['distance_km'] = r.distance_km
         result.append(item)
     return jsonify(result)
+
+
+# ============ УМНЫЙ ПЛАН ТРЕНИРОВОК ============
+@app.route('/api/generate_plan', methods=['POST'])
+@login_required
+def generate_training_plan():
+    try:
+        data = request.json
+        goal_km = float(data.get('goal_km', 5))
+        days = int(data.get('days', 14))
+
+        TrainingPlan.query.filter_by(user_id=current_user.id).delete()
+        plan = TrainingPlan(user_id=current_user.id, goal_distance=goal_km, days=days,
+                            plan_data=json.dumps([]), end_date=datetime.utcnow() + timedelta(days=days))
+        db.session.add(plan);
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/training_plan', methods=['GET'])
+@login_required
+def get_training_plan():
+    plan = TrainingPlan.query.filter_by(user_id=current_user.id).order_by(TrainingPlan.created_at.desc()).first()
+    if not plan: return jsonify({'plan': None})
+    return jsonify({'plan': json.loads(plan.plan_data), 'goal_distance': plan.goal_distance,
+                    'days': plan.days, 'completed_days': json.loads(plan.completed_days)})
+
+
+@app.route('/api/training_plan/toggle_day', methods=['POST'])
+@login_required
+def toggle_plan_day():
+    data = request.json
+    day = data.get('day')
+    plan = TrainingPlan.query.filter_by(user_id=current_user.id).first()
+    if not plan: return jsonify({'error': 'План не найден'}), 404
+    completed = json.loads(plan.completed_days)
+    if day in completed:
+        completed.remove(day)
+    else:
+        completed.append(day)
+    plan.completed_days = json.dumps(completed)
+    db.session.commit()
+    return jsonify({'completed': completed})
+
+
+@app.route('/api/training_plan/delete', methods=['DELETE'])
+@login_required
+def delete_training_plan():
+    TrainingPlan.query.filter_by(user_id=current_user.id).delete()
+    db.session.commit()
+    return jsonify({'message': 'Deleted'})
 
 
 # ============ AI ЧАТ ============
@@ -531,40 +666,47 @@ def ai_coach_page(): return render_template('ai_chat.html')
 @login_required
 def ai_chat():
     try:
-        data = request.json; user_message = data.get('message', '')
-        db.session.add(ChatMessage(user_id=current_user.id, message=user_message, is_user=True)); db.session.commit()
+        data = request.json;
+        user_message = data.get('message', '')
+        db.session.add(ChatMessage(user_id=current_user.id, message=user_message, is_user=True));
+        db.session.commit()
         activities = Activity.query.filter_by(user_id=current_user.id).all()
         running = [a for a in activities if a.sport_type == 'running']
         cycling = [a for a in activities if a.sport_type == 'cycling']
         swimming = [a for a in activities if a.sport_type == 'swimming']
         strength = [a for a in activities if a.sport_type == 'strength']
         context = "СТАТИСТИКА ТРЕНИРОВОК:\n"
-        if running: context += f"🏃 Бег: {len(running)} тренировок, {sum(a.distance for a in running)/1000:.2f} км\n"
-        if cycling: context += f"🚴 Вело: {len(cycling)} тренировок, {sum(a.distance for a in cycling)/1000:.2f} км\n"
+        if running: context += f"🏃 Бег: {len(running)} тренировок, {sum(a.distance for a in running) / 1000:.2f} км\n"
+        if cycling: context += f"🚴 Вело: {len(cycling)} тренировок, {sum(a.distance for a in cycling) / 1000:.2f} км\n"
         if swimming: context += f"🏊 Плавание: {len(swimming)} тренировок, {sum(a.distance for a in swimming):.0f} м\n"
         if strength: context += f"🏋️ Силовые: {len(strength)} тренировок, {sum(a.sets or 0 for a in strength)} подходов\n"
         context += "\nПОСЛЕДНИЕ 5 ТРЕНИРОВОК:\n"
         for a in activities[:5]:
             date = a.start_time.strftime('%d.%m.%Y')
-            details = f"{a.sets or 0} подх." if a.sport_type == 'strength' else (f"{a.distance:.0f} м" if a.sport_type == 'swimming' else f"{a.distance/1000:.2f} км")
-            context += f"- {date}: {a.sport_type} — {details}, {a.duration//60} мин\n"
+            details = f"{a.sets or 0} подх." if a.sport_type == 'strength' else (
+                f"{a.distance:.0f} м" if a.sport_type == 'swimming' else f"{a.distance / 1000:.2f} км")
+            context += f"- {date}: {a.sport_type} — {details}, {a.duration // 60} мин\n"
         reply = ask_ai(user_message, context) or get_fallback_response()
-        db.session.add(ChatMessage(user_id=current_user.id, message=reply, is_user=False)); db.session.commit()
+        db.session.add(ChatMessage(user_id=current_user.id, message=reply, is_user=False));
+        db.session.commit()
         return jsonify({'reply': reply})
-    except Exception as e: return jsonify({'reply': get_fallback_response()})
+    except Exception as e:
+        return jsonify({'reply': get_fallback_response()})
 
 
 @app.route('/api/ai/history', methods=['GET'])
 @login_required
 def get_chat_history():
-    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.created_at.asc()).limit(50).all()
+    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.created_at.asc()).limit(
+        50).all()
     return jsonify([m.to_dict() for m in messages])
 
 
 @app.route('/api/ai/clear', methods=['POST'])
 @login_required
 def clear_chat_history():
-    ChatMessage.query.filter_by(user_id=current_user.id).delete(); db.session.commit()
+    ChatMessage.query.filter_by(user_id=current_user.id).delete();
+    db.session.commit()
     return jsonify({'message': 'Cleared'})
 
 
@@ -627,8 +769,6 @@ def manifest(): return send_from_directory('static', 'manifest.json')
 @app.route('/sw.js')
 def service_worker(): return send_from_directory('static', 'sw.js')
 
-
-import os
 
 if __name__ == '__main__':
     with app.app_context():
